@@ -1,0 +1,83 @@
+/* Documentary + Intelligent Classroom Notebook Aesthetic (Section 9) */
+:root {
+  --paper-bg: #faf7f0;
+  --paper-card: #fffdf8;
+  --ink-primary: #1c1917;
+  --ink-secondary: #57534e;
+  --ochre-accent: #9a3412;
+  --indigo-ink: #1e3a8a;
+  --emerald-stamp: #065f46;
+  --crimson-margin: #e11d48;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--paper-bg);
+  color: var(--ink-primary);
+}
+
+.notebook-surface {
+  background-color: #faf7f0;
+  background-image:
+    radial-gradient(#d6d3d1 0.75px, transparent 0.75px),
+    linear-gradient(to bottom, rgba(214, 211, 209, 0.16) 1px, transparent 1px);
+  background-size: 24px 24px, 100% 32px;
+}
+
+.font-editorial {
+  font-family: 'Fraunces', Georgia, serif;
+}
+
+.font-handwritten {
+  font-family: 'Caveat', cursive;
+}
+
+.notebook-card {
+  background: var(--paper-card);
+  border: 1px solid rgba(120, 53, 15, 0.16);
+  box-shadow: 0 4px 18px -4px rgba(28, 25, 23, 0.06), 0 1px 3px rgba(28, 25, 23, 0.04);
+}
+
+.notebook-margin-line {
+  border-left: 3px double rgba(225, 29, 72, 0.35);
+}
+
+.stamp-badge {
+  border: 1.5px dashed currentColor;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hand-highlight {
+  background: linear-gradient(104deg, rgba(253, 230, 138, 0) 0.9%, rgba(253, 230, 138, 0.85) 2.4%, rgba(253, 230, 138, 0.55) 5.8%, rgba(253, 230, 138, 0.75) 93%, rgba(253, 230, 138, 0.2) 96%, rgba(253, 230, 138, 0) 98%);
+  padding: 0.05em 0.35em;
+  border-radius: 4px;
+}
+
+.nav-item-active {
+  background: linear-gradient(90deg, #7c2d12 0%, #9a3412 100%);
+  color: #fffbeb !important;
+  box-shadow: 0 4px 12px rgba(124, 45, 18, 0.25);
+}
+
+/* Custom Subtle Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #f5f0e6;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7b9a5;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9a3412;
+}
+
+@media print {
+  aside, header, .no-print {
+    display: none !important;
+  }
+}
