@@ -15,104 +15,175 @@ import {
   FLASHCARDS_BANK,
   CHRONOLOGY_CHALLENGES,
   HISTORICAL_MAPS_METADATA,
+  DISTRICT_33_CORRELATION,
+  BILINGUAL_TELUGU_NOTES,
+  QUESTION_TELUGU_MAP,
   EXPORT_DOCUMENTS_CATALOG
 } from '../data/knowledge_base';
 
 type Bindings = {
-  DB: D1Database;
+  DB?: D1Database;
 };
 
 export const apiRouter = new Hono<{ Bindings: Bindings }>();
 
-async function ensureSchema(db: D1Database) {
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS learners (
-      id TEXT PRIMARY KEY,
-      display_name TEXT NOT NULL,
-      pin_hash TEXT NOT NULL DEFAULT '2014',
-      target_exam TEXT NOT NULL DEFAULT 'BOTH',
-      exam_start_date TEXT NOT NULL,
-      current_day INTEGER NOT NULL DEFAULT 1,
-      daily_goal_minutes INTEGER NOT NULL DEFAULT 150,
-      total_study_seconds INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS topic_progress (
-      learner_id TEXT NOT NULL,
-      topic_id TEXT NOT NULL,
-      day_number INTEGER NOT NULL,
-      studied INTEGER NOT NULL DEFAULT 0,
-      time_spent_seconds INTEGER NOT NULL DEFAULT 0,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      correct_count INTEGER NOT NULL DEFAULT 0,
-      high_conf_wrong INTEGER NOT NULL DEFAULT 0,
-      ease_factor REAL NOT NULL DEFAULT 2.5,
-      interval_days INTEGER NOT NULL DEFAULT 0,
-      repetition_step INTEGER NOT NULL DEFAULT 0,
-      next_review_at TEXT,
-      last_studied_at TEXT,
-      mastery_score REAL NOT NULL DEFAULT 0,
-      notes TEXT DEFAULT '',
-      PRIMARY KEY (learner_id, topic_id)
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS question_attempts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      learner_id TEXT NOT NULL,
-      question_id TEXT NOT NULL,
-      topic_id TEXT NOT NULL,
-      selected_option INTEGER NOT NULL,
-      is_correct INTEGER NOT NULL,
-      confidence INTEGER NOT NULL DEFAULT 2,
-      time_taken_ms INTEGER NOT NULL DEFAULT 0,
-      mode TEXT NOT NULL DEFAULT 'practice',
-      confused_entity_id TEXT DEFAULT '',
-      attempted_at TEXT DEFAULT (datetime('now'))
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS flashcard_reviews (
-      learner_id TEXT NOT NULL,
-      card_id TEXT NOT NULL,
-      category TEXT NOT NULL,
-      box_level INTEGER NOT NULL DEFAULT 0,
-      ease_factor REAL NOT NULL DEFAULT 2.5,
-      interval_days INTEGER NOT NULL DEFAULT 0,
-      wrong_streak INTEGER NOT NULL DEFAULT 0,
-      total_reviews INTEGER NOT NULL DEFAULT 0,
-      next_review_at TEXT,
-      last_reviewed_at TEXT,
-      PRIMARY KEY (learner_id, card_id)
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS exam_sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      learner_id TEXT NOT NULL,
-      exam_type TEXT NOT NULL,
-      total_questions INTEGER NOT NULL,
-      attempted INTEGER NOT NULL,
-      correct INTEGER NOT NULL,
-      wrong INTEGER NOT NULL,
-      unanswered INTEGER NOT NULL,
-      negative_rate REAL NOT NULL,
-      raw_score REAL NOT NULL,
-      max_score REAL NOT NULL,
-      accuracy_pct REAL NOT NULL,
-      duration_seconds INTEGER NOT NULL,
-      weak_topics_json TEXT NOT NULL DEFAULT '[]',
-      completed_at TEXT DEFAULT (datetime('now'))
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS confusion_flags (
-      learner_id TEXT NOT NULL,
-      pair_id TEXT NOT NULL,
-      trigger_count INTEGER NOT NULL DEFAULT 1,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      last_triggered_at TEXT DEFAULT (datetime('now')),
-      PRIMARY KEY (learner_id, pair_id)
-    )`),
-    db.prepare(`INSERT OR IGNORE INTO learners (id, display_name, pin_hash, target_exam, exam_start_date, current_day, daily_goal_minutes)
-      VALUES ('aspirant-default', 'Telangana Police Aspirant (2026)', '2014', 'BOTH', '2026-11-14', 1, 150)`)
-  ]);
+let schemaInitialized = false;
+
+async function ensureSchema(db?: D1Database): Promise<boolean> {
+  if (!db) return false;
+  if (schemaInitialized) return true;
+  try {
+    await db.batch([
+      db.prepare(`CREATE TABLE IF NOT EXISTS learners (
+        id TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        pin_hash TEXT NOT NULL DEFAULT '2014',
+        target_exam TEXT NOT NULL DEFAULT 'BOTH',
+        exam_start_date TEXT NOT NULL,
+        current_day INTEGER NOT NULL DEFAULT 1,
+        daily_goal_minutes INTEGER NOT NULL DEFAULT 150,
+        total_study_seconds INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS topic_progress (
+        learner_id TEXT NOT NULL,
+        topic_id TEXT NOT NULL,
+        day_number INTEGER NOT NULL,
+        studied INTEGER NOT NULL DEFAULT 0,
+        time_spent_seconds INTEGER NOT NULL DEFAULT 0,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        correct_count INTEGER NOT NULL DEFAULT 0,
+        high_conf_wrong INTEGER NOT NULL DEFAULT 0,
+        ease_factor REAL NOT NULL DEFAULT 2.5,
+        interval_days INTEGER NOT NULL DEFAULT 0,
+        repetition_step INTEGER NOT NULL DEFAULT 0,
+        next_review_at TEXT,
+        last_studied_at TEXT,
+        mastery_score REAL NOT NULL DEFAULT 0,
+        notes TEXT DEFAULT '',
+        PRIMARY KEY (learner_id, topic_id)
+      )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS question_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        learner_id TEXT NOT NULL,
+        question_id TEXT NOT NULL,
+        topic_id TEXT NOT NULL,
+        selected_option INTEGER NOT NULL,
+        is_correct INTEGER NOT NULL,
+        confidence INTEGER NOT NULL DEFAULT 2,
+        time_taken_ms INTEGER NOT NULL DEFAULT 0,
+        mode TEXT NOT NULL DEFAULT 'practice',
+        confused_entity_id TEXT DEFAULT '',
+        attempted_at TEXT DEFAULT (datetime('now'))
+      )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS flashcard_reviews (
+        learner_id TEXT NOT NULL,
+        card_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        box_level INTEGER NOT NULL DEFAULT 0,
+        ease_factor REAL NOT NULL DEFAULT 2.5,
+        interval_days INTEGER NOT NULL DEFAULT 0,
+        wrong_streak INTEGER NOT NULL DEFAULT 0,
+        total_reviews INTEGER NOT NULL DEFAULT 0,
+        next_review_at TEXT,
+        last_reviewed_at TEXT,
+        PRIMARY KEY (learner_id, card_id)
+      )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS exam_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        learner_id TEXT NOT NULL,
+        exam_type TEXT NOT NULL,
+        total_questions INTEGER NOT NULL,
+        attempted INTEGER NOT NULL,
+        correct INTEGER NOT NULL,
+        wrong INTEGER NOT NULL,
+        unanswered INTEGER NOT NULL,
+        negative_rate REAL NOT NULL,
+        raw_score REAL NOT NULL,
+        max_score REAL NOT NULL,
+        accuracy_pct REAL NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        weak_topics_json TEXT NOT NULL DEFAULT '[]',
+        completed_at TEXT DEFAULT (datetime('now'))
+      )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS confusion_flags (
+        learner_id TEXT NOT NULL,
+        pair_id TEXT NOT NULL,
+        trigger_count INTEGER NOT NULL DEFAULT 1,
+        resolved INTEGER NOT NULL DEFAULT 0,
+        last_triggered_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (learner_id, pair_id)
+      )`),
+      db.prepare(`INSERT OR IGNORE INTO learners (id, display_name, pin_hash, target_exam, exam_start_date, current_day, daily_goal_minutes)
+        VALUES ('aspirant-default', 'Telangana Police Aspirant (2026)', '2014', 'BOTH', '2026-11-14', 1, 150)`)
+    ]);
+    schemaInitialized = true;
+    return true;
+  } catch (err) {
+    console.warn('[D1 ensureSchema fallback]:', err);
+    return false;
+  }
 }
 
-// Compute computed PYQ statistics dynamically from ALL_QUESTIONS
+function defaultFallbackLearnerState(learnerId: string) {
+  return {
+    learner: {
+      id: learnerId,
+      display_name: learnerId === 'aspirant-default' ? 'Telangana Police Aspirant (2026)' : learnerId,
+      target_exam: 'BOTH',
+      exam_start_date: '2026-11-14',
+      current_day: 1,
+      daily_goal_minutes: 150,
+      total_study_seconds: 0
+    },
+    topicProgress: [],
+    recentAttempts: [],
+    flashcardReviews: [],
+    examSessions: [],
+    confusionFlags: []
+  };
+}
+
+async function fetchLearnerState(db: D1Database | undefined, learnerId: string) {
+  const ready = await ensureSchema(db);
+  if (!ready || !db) {
+    return defaultFallbackLearnerState(learnerId);
+  }
+  try {
+    let learner = await db.prepare(`SELECT * FROM learners WHERE id = ?`).bind(learnerId).first<any>();
+    if (!learner) {
+      await db.prepare(
+        `INSERT OR IGNORE INTO learners (id, display_name, pin_hash, target_exam, exam_start_date, current_day, daily_goal_minutes)
+         VALUES (?, ?, '2014', 'BOTH', date('now'), 1, 150)`
+      ).bind(learnerId, learnerId === 'aspirant-default' ? 'Telangana Police Aspirant (2026)' : learnerId).run();
+      learner = await db.prepare(`SELECT * FROM learners WHERE id = ?`).bind(learnerId).first<any>();
+    }
+
+    const [progress, attempts, flashcards, exams, confusions, allProfiles] = await Promise.all([
+      db.prepare(`SELECT * FROM topic_progress WHERE learner_id = ?`).bind(learnerId).all(),
+      db.prepare(`SELECT * FROM question_attempts WHERE learner_id = ? ORDER BY attempted_at DESC LIMIT 200`).bind(learnerId).all(),
+      db.prepare(`SELECT * FROM flashcard_reviews WHERE learner_id = ?`).bind(learnerId).all(),
+      db.prepare(`SELECT * FROM exam_sessions WHERE learner_id = ? ORDER BY completed_at DESC LIMIT 25`).bind(learnerId).all(),
+      db.prepare(`SELECT * FROM confusion_flags WHERE learner_id = ? ORDER BY trigger_count DESC`).bind(learnerId).all(),
+      db.prepare(`SELECT id, display_name, target_exam, current_day, updated_at FROM learners ORDER BY updated_at DESC LIMIT 20`).all()
+    ]);
+
+    return {
+      learner: learner || defaultFallbackLearnerState(learnerId).learner,
+      profiles: allProfiles.results || [],
+      topicProgress: progress.results || [],
+      recentAttempts: attempts.results || [],
+      flashcardReviews: flashcards.results || [],
+      examSessions: exams.results || [],
+      confusionFlags: confusions.results || []
+    };
+  } catch (err) {
+    console.warn('[D1 fetchLearnerState fallback]:', err);
+    return defaultFallbackLearnerState(learnerId);
+  }
+}
+
 function computePyqReport() {
   const verified = ALL_QUESTIONS.filter((q) => q.origin === 'VERIFIED_PYQ');
   const adapted = ALL_QUESTIONS.filter((q) => q.origin === 'ADAPTED_PYQ');
@@ -159,66 +230,85 @@ function computePyqReport() {
   };
 }
 
-// 1. Full Bootstrap Bundle (Single round-trip fast load for all 16 UI modules)
+// 1. Full Bootstrap Bundle (Hardened with graceful D1 fallback — never throws 500 or aborts load)
 apiRouter.get('/bootstrap', async (c) => {
-  const learnerId = c.req.query('learnerId') || 'aspirant-default';
-  let learnerState = null;
+  try {
+    const rawId = (c.req.query('learnerId') || 'aspirant-default').trim();
+    const learnerId = rawId.replace(/[^a-zA-Z0-9_-]/g, '') || 'aspirant-default';
+    const learnerState = await fetchLearnerState(c.env?.DB, learnerId);
 
-  if (c.env?.DB) {
-    await ensureSchema(c.env.DB);
-    const learner = await c.env.DB.prepare(`SELECT * FROM learners WHERE id = ?`).bind(learnerId).first();
-    const progress = await c.env.DB.prepare(`SELECT * FROM topic_progress WHERE learner_id = ?`).bind(learnerId).all();
-    const attempts = await c.env.DB.prepare(
-      `SELECT * FROM question_attempts WHERE learner_id = ? ORDER BY attempted_at DESC LIMIT 200`
-    ).bind(learnerId).all();
-    const flashcards = await c.env.DB.prepare(`SELECT * FROM flashcard_reviews WHERE learner_id = ?`).bind(learnerId).all();
-    const exams = await c.env.DB.prepare(
-      `SELECT * FROM exam_sessions WHERE learner_id = ? ORDER BY completed_at DESC LIMIT 25`
-    ).bind(learnerId).all();
-    const confusions = await c.env.DB.prepare(
-      `SELECT * FROM confusion_flags WHERE learner_id = ? ORDER BY trigger_count DESC`
-    ).bind(learnerId).all();
-
-    learnerState = {
-      learner,
-      topicProgress: progress.results || [],
-      recentAttempts: attempts.results || [],
-      flashcardReviews: flashcards.results || [],
-      examSessions: exams.results || [],
-      confusionFlags: confusions.results || []
-    };
+    c.header('Cache-Control', 'no-store');
+    return c.json({
+      ok: true,
+      syllabusIntelligence: SYLLABUS_INTELLIGENCE,
+      curriculumDays: CURRICULUM_DAYS,
+      personalities: PERSONALITIES,
+      committees: COMMITTEES,
+      relationshipChains: RELATIONSHIP_CHAINS,
+      whoIsWhoTraps: WHO_IS_WHO_TRAPS,
+      confusionPairs: CONFUSION_PAIRS,
+      questions: ALL_QUESTIONS,
+      pyqAnalytics: computePyqReport(),
+      flashcards: FLASHCARDS_BANK,
+      chronologyChallenges: CHRONOLOGY_CHALLENGES,
+      historicalMaps: HISTORICAL_MAPS_METADATA,
+      district33Correlation: DISTRICT_33_CORRELATION,
+      bilingualTelugu: BILINGUAL_TELUGU_NOTES,
+      questionTeluguMap: QUESTION_TELUGU_MAP,
+      sourcesLibrary: SOURCES_LIBRARY,
+      historicalDiscrepancies: HISTORICAL_DISCREPANCIES,
+      exportsCatalog: EXPORT_DOCUMENTS_CATALOG,
+      learnerState
+    });
+  } catch (err: any) {
+    return c.json({
+      ok: true,
+      warning: String(err?.message || 'Recovered with static knowledge bundle'),
+      syllabusIntelligence: SYLLABUS_INTELLIGENCE,
+      curriculumDays: CURRICULUM_DAYS,
+      personalities: PERSONALITIES,
+      committees: COMMITTEES,
+      relationshipChains: RELATIONSHIP_CHAINS,
+      whoIsWhoTraps: WHO_IS_WHO_TRAPS,
+      confusionPairs: CONFUSION_PAIRS,
+      questions: ALL_QUESTIONS,
+      pyqAnalytics: computePyqReport(),
+      flashcards: FLASHCARDS_BANK,
+      chronologyChallenges: CHRONOLOGY_CHALLENGES,
+      historicalMaps: HISTORICAL_MAPS_METADATA,
+      district33Correlation: DISTRICT_33_CORRELATION,
+      bilingualTelugu: BILINGUAL_TELUGU_NOTES,
+      questionTeluguMap: QUESTION_TELUGU_MAP,
+      sourcesLibrary: SOURCES_LIBRARY,
+      historicalDiscrepancies: HISTORICAL_DISCREPANCIES,
+      exportsCatalog: EXPORT_DOCUMENTS_CATALOG,
+      learnerState: defaultFallbackLearnerState('aspirant-default')
+    });
   }
+});
 
-  return c.json({
-    ok: true,
-    syllabusIntelligence: SYLLABUS_INTELLIGENCE,
-    curriculumDays: CURRICULUM_DAYS,
-    personalities: PERSONALITIES,
-    committees: COMMITTEES,
-    relationshipChains: RELATIONSHIP_CHAINS,
-    whoIsWhoTraps: WHO_IS_WHO_TRAPS,
-    confusionPairs: CONFUSION_PAIRS,
-    questions: ALL_QUESTIONS,
-    pyqAnalytics: computePyqReport(),
-    flashcards: FLASHCARDS_BANK,
-    chronologyChallenges: CHRONOLOGY_CHALLENGES,
-    historicalMaps: HISTORICAL_MAPS_METADATA,
-    sourcesLibrary: SOURCES_LIBRARY,
-    historicalDiscrepancies: HISTORICAL_DISCREPANCIES,
-    exportsCatalog: EXPORT_DOCUMENTS_CATALOG,
-    learnerState
-  });
+// 1b. Lightweight Learner-State-Only Sync (Prevents re-downloading 400KB static bundle on every click!)
+apiRouter.get('/learner/state', async (c) => {
+  const rawId = (c.req.query('learnerId') || 'aspirant-default').trim();
+  const learnerId = rawId.replace(/[^a-zA-Z0-9_-]/g, '') || 'aspirant-default';
+  const learnerState = await fetchLearnerState(c.env?.DB, learnerId);
+  c.header('Cache-Control', 'no-store');
+  return c.json({ ok: true, learnerState });
 });
 
 // 2. Learner Profile Switch / Login / Update Target Exam
 apiRouter.post('/learner/profile', async (c) => {
-  await ensureSchema(c.env.DB);
-  const body = await c.req.json();
-  const id = (body.learnerId || 'aspirant-default').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  const displayName = body.displayName || 'Telangana Police Aspirant';
+  const ready = await ensureSchema(c.env?.DB);
+  const body = await c.req.json().catch(() => ({}));
+  const id = String(body.learnerId || 'aspirant-default').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'aspirant-default';
+  const displayName = String(body.displayName || 'Telangana Police Aspirant').trim().slice(0, 60);
   const targetExam = ['SI', 'PC', 'BOTH'].includes(body.targetExam) ? body.targetExam : 'BOTH';
   const currentDay = Math.min(10, Math.max(1, Number(body.currentDay || 1)));
   const pin = String(body.pin || '2014');
+
+  if (!ready || !c.env?.DB) {
+    return c.json({ ok: true, learnerState: defaultFallbackLearnerState(id) });
+  }
 
   const existing = await c.env.DB.prepare(`SELECT * FROM learners WHERE id = ?`).bind(id).first<any>();
   if (!existing) {
@@ -232,17 +322,36 @@ apiRouter.post('/learner/profile', async (c) => {
     ).bind(displayName, targetExam, currentDay, id).run();
   }
 
-  const updated = await c.env.DB.prepare(`SELECT * FROM learners WHERE id = ?`).bind(id).first();
-  return c.json({ ok: true, learner: updated });
+  const learnerState = await fetchLearnerState(c.env.DB, id);
+  return c.json({ ok: true, learner: learnerState.learner, learnerState });
 });
 
-// 3. Record Topic Study / Lesson Completion + Spaced Repetition Schedule
-// Review intervals: Step 1 = Immediate/Same Day (0d), Step 2 = Next Day (1d), Step 3 = 3 Days (3d), Step 4 = 7 Days (7d), Step 5 = Final Pre-Exam (10d)
+// 2b. Reset Session Mastery & Progress for Current Learner (Confirmed via In-App Modal)
+apiRouter.post('/learner/reset', async (c) => {
+  const ready = await ensureSchema(c.env?.DB);
+  const body = await c.req.json().catch(() => ({}));
+  const id = String(body.learnerId || 'aspirant-default').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'aspirant-default';
+
+  if (ready && c.env?.DB) {
+    await c.env.DB.batch([
+      c.env.DB.prepare(`DELETE FROM topic_progress WHERE learner_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM question_attempts WHERE learner_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM flashcard_reviews WHERE learner_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM exam_sessions WHERE learner_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM confusion_flags WHERE learner_id = ?`).bind(id),
+      c.env.DB.prepare(`UPDATE learners SET current_day = 1, total_study_seconds = 0, updated_at = datetime('now') WHERE id = ?`).bind(id)
+    ]);
+  }
+
+  const learnerState = await fetchLearnerState(c.env?.DB, id);
+  return c.json({ ok: true, learnerState });
+});
+
 function computeNextIntervalDays(step: number, accuracyRatio: number, highConfWrong: number): number {
   const baseLadder = [0, 1, 3, 7, 10];
   let idx = Math.min(baseLadder.length - 1, Math.max(1, step));
   if (highConfWrong > 0 || accuracyRatio < 0.7) {
-    return 1; // Force next-day urgent review if accuracy < 70% or high-confidence error detected
+    return 1;
   }
   if (accuracyRatio < 0.85) {
     idx = Math.max(1, idx - 1);
@@ -250,11 +359,9 @@ function computeNextIntervalDays(step: number, accuracyRatio: number, highConfWr
   return baseLadder[idx];
 }
 
-// Transparent Mastery Formula (Requires repeated retrieval across distinct questions — prevents single lucky quiz from giving 90%+!)
 function calculateTransparentMastery(studied: number, attempts: number, correct: number, highConfWrong: number, repStep: number): number {
   if (attempts === 0) return studied ? 20 : 0;
   const rawAcc = (correct / attempts) * 100;
-  // Volume reliability factor: needs at least 5 question retrievals on a topic to unlock full 100% weight
   const volumeFactor = Math.min(1.0, attempts / 5);
   const retentionBonus = Math.min(12, repStep * 3);
   const overconfidencePenalty = Math.min(25, highConfWrong * 6);
@@ -262,9 +369,11 @@ function calculateTransparentMastery(studied: number, attempts: number, correct:
   return Math.round(Math.max(0, Math.min(100, score)) * 10) / 10;
 }
 
+// 3. Record Topic Study / Lesson Completion
 apiRouter.post('/progress/study', async (c) => {
-  await ensureSchema(c.env.DB);
+  const ready = await ensureSchema(c.env?.DB);
   const { learnerId = 'aspirant-default', topicId, dayNumber = 1, addSeconds = 120, markStudied = true, notes } = await c.req.json();
+  if (!ready || !c.env?.DB) return c.json({ ok: true });
 
   const existing = await c.env.DB.prepare(
     `SELECT * FROM topic_progress WHERE learner_id = ? AND topic_id = ?`
@@ -323,12 +432,12 @@ apiRouter.post('/progress/study', async (c) => {
 
 // 4. Record Question Attempt + Confidence Calibration + Weak-Memory Confusion Detector
 apiRouter.post('/attempts/record', async (c) => {
-  await ensureSchema(c.env.DB);
+  const ready = await ensureSchema(c.env?.DB);
   const {
     learnerId = 'aspirant-default',
     questionId,
     selectedOption,
-    confidence = 2, // 1=Low, 2=Medium, 3=High
+    confidence = 2,
     timeTakenMs = 8000,
     mode = 'practice'
   } = await c.req.json();
@@ -338,6 +447,23 @@ apiRouter.post('/attempts/record', async (c) => {
 
   const isCorrect = Number(selectedOption) === q.correctIndex ? 1 : 0;
   const isHighConfWrong = !isCorrect && Number(confidence) === 3 ? 1 : 0;
+  let triggeredConfusionPair = !isCorrect && q.confusionPairId
+    ? CONFUSION_PAIRS.find((cp) => cp.id === q.confusionPairId) || null
+    : null;
+
+  if (!ready || !c.env?.DB) {
+    return c.json({
+      ok: true,
+      isCorrect: Boolean(isCorrect),
+      isHighConfWrong: Boolean(isHighConfWrong),
+      correctIndex: q.correctIndex,
+      explanation: q.explanation,
+      whyOthersWrong: q.whyOthersWrong,
+      updatedMastery: isCorrect ? 65 : 20,
+      nextReviewInDays: 1,
+      triggeredConfusionPair
+    });
+  }
 
   await c.env.DB.prepare(
     `INSERT INTO question_attempts (learner_id, question_id, topic_id, selected_option, is_correct, confidence, time_taken_ms, mode, confused_entity_id)
@@ -356,8 +482,6 @@ apiRouter.post('/attempts/record', async (c) => {
     )
     .run();
 
-  // Trigger Weak-Memory Detector automatically if wrong on a question linked to a Confusion Pair!
-  let triggeredConfusionPair = null;
   if (!isCorrect && q.confusionPairId) {
     await c.env.DB.prepare(
       `INSERT INTO confusion_flags (learner_id, pair_id, trigger_count, resolved, last_triggered_at)
@@ -369,11 +493,8 @@ apiRouter.post('/attempts/record', async (c) => {
     )
       .bind(learnerId, q.confusionPairId, isHighConfWrong ? 2 : 1, isHighConfWrong ? 2 : 1)
       .run();
-
-    triggeredConfusionPair = CONFUSION_PAIRS.find((cp) => cp.id === q.confusionPairId) || null;
   }
 
-  // Update Topic Mastery & Dynamic Spaced Repetition
   const existing = await c.env.DB.prepare(
     `SELECT * FROM topic_progress WHERE learner_id = ? AND topic_id = ?`
   ).bind(learnerId, q.topicId).first<any>();
@@ -418,6 +539,8 @@ apiRouter.post('/attempts/record', async (c) => {
     )
     .run();
 
+  const learnerState = await fetchLearnerState(c.env.DB, learnerId);
+
   return c.json({
     ok: true,
     isCorrect: Boolean(isCorrect),
@@ -427,26 +550,31 @@ apiRouter.post('/attempts/record', async (c) => {
     whyOthersWrong: q.whyOthersWrong,
     updatedMastery: mastery,
     nextReviewInDays: intervalDays,
-    triggeredConfusionPair
+    triggeredConfusionPair,
+    learnerState
   });
 });
 
-// 5. Resolve a Weak-Memory Confusion Pair after targeted comparison review
+// 5. Resolve a Weak-Memory Confusion Pair
 apiRouter.post('/weak-memory/resolve', async (c) => {
-  await ensureSchema(c.env.DB);
+  const ready = await ensureSchema(c.env?.DB);
   const { learnerId = 'aspirant-default', pairId } = await c.req.json();
-  await c.env.DB.prepare(
-    `UPDATE confusion_flags SET resolved = 1 WHERE learner_id = ? AND pair_id = ?`
-  ).bind(learnerId, pairId).run();
-  return c.json({ ok: true });
+  if (ready && c.env?.DB) {
+    await c.env.DB.prepare(
+      `UPDATE confusion_flags SET resolved = 1 WHERE learner_id = ? AND pair_id = ?`
+    ).bind(learnerId, pairId).run();
+  }
+  const learnerState = await fetchLearnerState(c.env?.DB, learnerId);
+  return c.json({ ok: true, learnerState });
 });
 
 // 6. Flashcard SM-2 Review Endpoint
 apiRouter.post('/flashcards/review', async (c) => {
-  await ensureSchema(c.env.DB);
-  const { learnerId = 'aspirant-default', cardId, rating = 3 } = await c.req.json(); // rating: 1=Again, 2=Hard, 3=Good, 4=Easy
+  const ready = await ensureSchema(c.env?.DB);
+  const { learnerId = 'aspirant-default', cardId, rating = 3 } = await c.req.json();
   const card = FLASHCARDS_BANK.find((fc) => fc.id === cardId);
   if (!card) return c.json({ ok: false, error: 'Flashcard not found' }, 404);
+  if (!ready || !c.env?.DB) return c.json({ ok: true, boxLevel: 1, intervalDays: 1 });
 
   const prev = await c.env.DB.prepare(
     `SELECT * FROM flashcard_reviews WHERE learner_id = ? AND card_id = ?`
@@ -488,15 +616,15 @@ apiRouter.post('/flashcards/review', async (c) => {
   return c.json({ ok: true, boxLevel: box, intervalDays: interval });
 });
 
-// 7. Submit Full Exam Simulator Session (Supports Official 2026 Negative Marking: 20% PWT / 25% SI FWE / 0% Practice)
+// 7. Submit Full Exam Simulator Session (Supports 25Q, 50Q & 100Q Grand Mocks)
 apiRouter.post('/exams/submit', async (c) => {
-  await ensureSchema(c.env.DB);
+  const ready = await ensureSchema(c.env?.DB);
   const {
     learnerId = 'aspirant-default',
     examType = 'SI_PWT',
     negativeRate = 0.20,
     durationSeconds = 0,
-    responses = [] // Array<{ questionId: string; selectedOption: number | null; confidence?: number }>
+    responses = []
   } = await c.req.json();
 
   let attempted = 0;
@@ -521,7 +649,7 @@ apiRouter.post('/exams/submit', async (c) => {
       } else {
         wrong += 1;
         topicBreakdown[q.topicId].wrong += 1;
-        if (q.confusionPairId) {
+        if (ready && c.env?.DB && q.confusionPairId) {
           await c.env.DB.prepare(
             `INSERT INTO confusion_flags (learner_id, pair_id, trigger_count, resolved, last_triggered_at)
              VALUES (?, ?, 1, 0, datetime('now'))
@@ -541,28 +669,32 @@ apiRouter.post('/exams/submit', async (c) => {
     .filter(([, stat]) => stat.total > 0 && stat.correct / stat.total < 0.85)
     .map(([topicId, stat]) => ({ topicId, accuracy: Math.round((stat.correct / stat.total) * 100) }));
 
-  await c.env.DB.prepare(
-    `INSERT INTO exam_sessions (
-       learner_id, exam_type, total_questions, attempted, correct, wrong, unanswered,
-       negative_rate, raw_score, max_score, accuracy_pct, duration_seconds, weak_topics_json
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      learnerId,
-      examType,
-      totalQuestions,
-      attempted,
-      correct,
-      wrong,
-      unanswered,
-      Number(negativeRate),
-      rawScore,
-      maxScore,
-      accuracyPct,
-      Number(durationSeconds),
-      JSON.stringify(weakTopics)
+  if (ready && c.env?.DB) {
+    await c.env.DB.prepare(
+      `INSERT INTO exam_sessions (
+         learner_id, exam_type, total_questions, attempted, correct, wrong, unanswered,
+         negative_rate, raw_score, max_score, accuracy_pct, duration_seconds, weak_topics_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run();
+      .bind(
+        learnerId,
+        examType,
+        totalQuestions,
+        attempted,
+        correct,
+        wrong,
+        unanswered,
+        Number(negativeRate),
+        rawScore,
+        maxScore,
+        accuracyPct,
+        Number(durationSeconds),
+        JSON.stringify(weakTopics)
+      )
+      .run();
+  }
+
+  const learnerState = await fetchLearnerState(c.env?.DB, learnerId);
 
   return c.json({
     ok: true,
@@ -580,6 +712,7 @@ apiRouter.post('/exams/submit', async (c) => {
       accuracyPct,
       meets90Target: accuracyPct >= 90 && attempted >= Math.ceil(totalQuestions * 0.85),
       weakTopics
-    }
+    },
+    learnerState
   });
 });

@@ -7,12 +7,15 @@ import { CURRICULUM_DAYS_6_TO_10 } from './curriculum_part2';
 import { PYQ_ANALYTICS_METADATA, VERIFIED_PYQS_PART1 } from './questions_part1';
 import { VERIFIED_PYQS_AND_MODEL_PART2 } from './questions_part2';
 import { QUESTIONS_PART3, FLASHCARDS_BANK, CHRONOLOGY_CHALLENGES } from './questions_part3_and_drills';
+import { QUESTIONS_GRAND_MOCK_PART4 } from './questions_part4_grand_mock';
+import { DISTRICT_33_CORRELATION, BILINGUAL_TELUGU_NOTES, QUESTION_TELUGU_MAP } from './bilingual_and_districts';
 
 export const CURRICULUM_DAYS = [...CURRICULUM_DAYS_1_TO_5, ...CURRICULUM_DAYS_6_TO_10];
 export const ALL_QUESTIONS = [
   ...VERIFIED_PYQS_PART1,
   ...VERIFIED_PYQS_AND_MODEL_PART2,
-  ...QUESTIONS_PART3
+  ...QUESTIONS_PART3,
+  ...QUESTIONS_GRAND_MOCK_PART4
 ];
 
 export const HISTORICAL_MAPS_METADATA = [
@@ -131,7 +134,7 @@ export const EXPORT_DOCUMENTS_CATALOG = [
     code: 'G',
     slug: 'G_Verified_PYQ_and_Practice_Question_Bank',
     title: 'G. Verified PYQ & Practice Question Bank',
-    subtitle: '38 Official TSLPRB PYQs strictly separated from 12 Analytical Model Questions, with 4-option distractor-by-distractor explanations.',
+    subtitle: '44 Official TSLPRB PYQs strictly separated from 76 Adapted/Analytical Practice Questions (120 Total), with 4-option distractor-by-distractor explanations.',
     pagesApprox: 'Annotated Question Bank'
   },
   {
@@ -155,5 +158,8 @@ export {
   CONFUSION_PAIRS,
   PYQ_ANALYTICS_METADATA,
   FLASHCARDS_BANK,
-  CHRONOLOGY_CHALLENGES
+  CHRONOLOGY_CHALLENGES,
+  DISTRICT_33_CORRELATION,
+  BILINGUAL_TELUGU_NOTES,
+  QUESTION_TELUGU_MAP
 };

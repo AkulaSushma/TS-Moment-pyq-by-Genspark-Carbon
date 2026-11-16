@@ -32,6 +32,11 @@ body {
   font-family: 'Caveat', cursive;
 }
 
+.font-telugu {
+  font-family: 'Noto Sans Telugu', 'Plus Jakarta Sans', system-ui, sans-serif;
+  line-height: 1.72;
+}
+
 .notebook-card {
   background: var(--paper-card);
   border: 1px solid rgba(120, 53, 15, 0.16);

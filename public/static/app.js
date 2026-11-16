@@ -3,8 +3,21 @@
 
 const STATE = {
   data: null,
+  bootstrapPromise: null,
   learnerId: localStorage.getItem('tg_learner_id') || 'aspirant-default',
   activeTab: 'dashboard', // 1..16 primary UX sections
+  sidebarGroupsOpen: {
+    Learn: true,
+    Practice: true,
+    'Deep-Dive': false,
+    Tools: false
+  },
+  langMode: localStorage.getItem('tg_lang_mode') || 'EN', // 'EN' | 'BILINGUAL' | 'TE'
+  profileModalOpen: false,
+  profileModalName: '',
+  profileModalTargetExam: 'BOTH',
+  profileResetConfirmArmed: false,
+  profileBusy: false,
   selectedDay: 1,
   visualLearningOnly: false,
   examLens: 'BOTH', // 'SI' | 'PC' | 'BOTH'
@@ -17,6 +30,9 @@ const STATE = {
   customCompareB: 'C-6POINT',
   selectedMapEra: 'MAP-1948',
   selectedLocationIdx: 0,
+  districtZoneFilter: 'ALL',
+  districtSearch: '',
+  selectedErstwhileNo: 0, // 0 = show all 10 -> 33 cards
   timelinePhaseFilter: 'ALL',
   pyqFilterExam: 'ALL',
   pyqFilterYear: 'ALL',
@@ -36,7 +52,7 @@ const STATE = {
   chronoChecked: false,
   // Exam Simulator state
   simConfig: {
-    examType: 'SI_PWT', // 'SI_PWT' | 'SI_FWE' | 'PC_PWT'
+    examType: 'SI_PWT', // 'SI_PWT' | 'SI_FWE' | 'PC_PWT' | 'SI_GRAND_50' | 'SI_GRAND_100' | 'PC_GRAND_50' | 'PC_GRAND_100'
     questionCount: 25,
     negativeRate: 0.20,
     durationMinutes: 25
@@ -50,24 +66,129 @@ const STATE = {
   sourceSearch: ''
 };
 
-const NAV_SECTIONS = [
-  { id: 'dashboard', num: 1, label: 'Home Dashboard', icon: 'fa-compass' },
-  { id: 'journey', num: 2, label: '10-Day Learning Journey', icon: 'fa-route' },
-  { id: 'timeline', num: 3, label: 'Chronological Timeline', icon: 'fa-stream' },
-  { id: 'lesson', num: 4, label: 'Learn the Concept (A–N)', icon: 'fa-book-open' },
-  { id: 'personalities', num: 5, label: 'Who Is Who? Personalities', icon: 'fa-id-card' },
-  { id: 'committees', num: 6, label: 'Committees & Commissions', icon: 'fa-sitemap' },
-  { id: 'compare', num: 7, label: 'Compare & Never Confuse', icon: 'fa-columns' },
-  { id: 'map', num: 8, label: 'Interactive Movement Map', icon: 'fa-map-marked-alt' },
-  { id: 'pyq', num: 9, label: 'PYQ Intelligence Centre', icon: 'fa-microscope' },
-  { id: 'practice', num: 10, label: 'Practice Question Bank', icon: 'fa-tasks' },
-  { id: 'simulator', num: 11, label: 'Full Exam Simulator', icon: 'fa-stopwatch' },
-  { id: 'flashcards', num: 12, label: 'Flashcards & Active Recall', icon: 'fa-clone' },
-  { id: 'weakmemory', num: 13, label: 'Weak Memory Revision', icon: 'fa-heartbeat' },
-  { id: 'analytics', num: 14, label: 'Mastery Analytics (90%+)', icon: 'fa-chart-line' },
-  { id: 'sources', num: 15, label: 'Sources & Fact Audit', icon: 'fa-balance-scale' },
-  { id: 'exports', num: 16, label: 'PDF & DOCX Export Centre', icon: 'fa-file-download' }
+const NAV_CATEGORIES = [
+  {
+    id: 'Learn',
+    label: 'Learn',
+    subtitle: '10-Day Core Curriculum',
+    icon: 'fa-graduation-cap',
+    items: [
+      { id: 'dashboard', num: 1, label: 'Home Dashboard', icon: 'fa-compass' },
+      { id: 'journey', num: 2, label: '10-Day Learning Journey', icon: 'fa-route' },
+      { id: 'timeline', num: 3, label: 'Chronological Timeline', icon: 'fa-stream' },
+      { id: 'lesson', num: 4, label: 'Learn the Concept (A–N)', icon: 'fa-book-open' }
+    ]
+  },
+  {
+    id: 'Practice',
+    label: 'Practice',
+    subtitle: 'PYQs, Drills & Grand Mocks',
+    icon: 'fa-bullseye',
+    items: [
+      { id: 'pyq', num: 9, label: 'PYQ Intelligence Centre', icon: 'fa-microscope' },
+      { id: 'practice', num: 10, label: 'Practice Question Bank', icon: 'fa-tasks' },
+      { id: 'simulator', num: 11, label: 'Full Exam Simulator', icon: 'fa-stopwatch' },
+      { id: 'flashcards', num: 12, label: 'Flashcards & Active Recall', icon: 'fa-clone' }
+    ]
+  },
+  {
+    id: 'Deep-Dive',
+    label: 'Deep-Dive',
+    subtitle: 'Atlas, Panels & 33 Districts',
+    icon: 'fa-layer-group',
+    items: [
+      { id: 'personalities', num: 5, label: 'Who Is Who? Personalities', icon: 'fa-id-card' },
+      { id: 'committees', num: 6, label: 'Committees & Commissions', icon: 'fa-sitemap' },
+      { id: 'compare', num: 7, label: 'Compare & Never Confuse', icon: 'fa-columns' },
+      { id: 'map', num: 8, label: 'Movement & 33-District Map', icon: 'fa-map-marked-alt' }
+    ]
+  },
+  {
+    id: 'Tools',
+    label: 'Tools',
+    subtitle: 'Memory, Audit & Book Exports',
+    icon: 'fa-toolbox',
+    items: [
+      { id: 'weakmemory', num: 13, label: 'Weak Memory Revision', icon: 'fa-heartbeat' },
+      { id: 'analytics', num: 14, label: 'Mastery Analytics (90%+)', icon: 'fa-chart-line' },
+      { id: 'sources', num: 15, label: 'Sources & Fact Audit', icon: 'fa-balance-scale' },
+      { id: 'exports', num: 16, label: 'PDF & DOCX Export Centre', icon: 'fa-file-download' }
+    ]
+  }
 ];
+
+const NAV_SECTIONS = NAV_CATEGORIES.flatMap((g) => g.items);
+
+const TELUGU_TERM_GLOSSARY = [
+  ['Gentlemen’s Agreement', 'పెద్దమనుషుల ఒప్పందం (20 ఫిబ్రవరి 1956)'],
+  ['States Reorganisation Commission', 'రాష్ట్రాల పునర్వ్యవస్థీకరణ కమిషన్ (ఫజల్ అలీ కమిషన్)'],
+  ['SRC', 'రాష్ట్రాల పునర్వ్యవస్థీకరణ కమిషన్ (SRC)'],
+  ['Operation Polo', 'ఆపరేషన్ పోలో (సెప్టెంబర్ 13–17, 1948)'],
+  ['Mulki Rules', 'ముల్కీ నిబంధనలు (1919 ఫర్మానా - 15 ఏళ్ల స్థిర నివాసం)'],
+  ['Non-Mulki', 'నాన్-ముల్కీ (స్థానికేతరులు)'],
+  ['Telangana Regional Committee', 'తెలంగాణ ప్రాంతీయ సంఘం (TRC - 1958)'],
+  ['Telangana Praja Samithi', 'తెలంగాణ ప్రజా సమితి (TPS - 1969)'],
+  ['Eight-Point Formula', 'అష్టసూత్ర పథకం (11 ఏప్రిల్ 1969)'],
+  ['Five-Point Formula', 'పంచసూత్ర పథకం (27 నవంబర్ 1972)'],
+  ['Six-Point Formula', 'షట్సూత్ర పథకం (21 సెప్టెంబర్ 1973)'],
+  ['Presidential Order', 'రాష్ట్రపతి ఉత్తర్వులు (18 అక్టోబర్ 1975 - జోనల్ విధానం)'],
+  ['Article 371-D', 'ఆర్టికల్ 371-D (32వ రాజ్యాంగ సవరణ)'],
+  ['G.O. 610', 'జి.ఓ. 610 (30 డిసెంబర్ 1985)'],
+  ['Girglani Commission', 'జె.ఎం. గిర్గ్లానీ కమిషన్ (2001–2004)'],
+  ['Jayabharath Reddy', 'కె. జయభారత్ రెడ్డి ఆఫీసర్స్ కమిటీ (1985)'],
+  ['Bhongir', 'భువనగిరి సభ (8–9 మార్చి 1997)'],
+  ['Warangal Declaration', 'వరంగల్ డిక్లరేషన్ (28–29 డిసెంబర్ 1997)'],
+  ['Telangana Rashtra Samithi', 'తెలంగాణ రాష్ట్ర సమితి (TRS - 27 ఏప్రిల్ 2001)'],
+  ['Free Zone', 'హైదరాబాద్ ఫ్రీ జోన్ తీర్పు (9 అక్టోబర్ 2009)'],
+  ['Srikrishna Committee', 'జస్టిస్ బి.ఎన్. శ్రీకృష్ణ కమిటీ (2010)'],
+  ['Telangana Joint Action Committee', 'తెలంగాణ జాయింట్ యాక్షన్ కమిటీ (TJAC - కోదండరాం)'],
+  ['TJAC', 'తెలంగాణ జాయింట్ యాక్షన్ కమిటీ (TJAC)'],
+  ['Million March', 'మిలియన్ మార్చ్ (10 మార్చి 2011)'],
+  ['Sakala Janula Samme', 'సకల జనుల సమ్మె (42 రోజులు: 13 సెప్టెంబర్ – 24 అక్టోబర్ 2011)'],
+  ['Sagara Haram', 'సాగరహారం / తెలంగాణ మార్చ్ (30 సెప్టెంబర్ 2012)'],
+  ['Reorganisation Act', 'ఆంధ్రప్రదేశ్ పునర్వ్యవస్థీకరణ చట్టం, 2014 (Act 6 of 2014)'],
+  ['Appointed Day', 'అపాయింటెడ్ డే / రాష్ట్ర ఆవిర్భావ దినం (2 జూన్ 2014)']
+];
+
+function getQuestionTeluguBundle(q) {
+  const map = STATE.data?.questionTeluguMap || {};
+  if (map[q.id]) return map[q.id];
+  const dayNotes = STATE.data?.bilingualTelugu?.[q.topicId];
+  const matchedTerms = [];
+  const hay = (q.stem + ' ' + (q.relatedConcept || '') + ' ' + (q.subtopic || '')).toLowerCase();
+  for (const [en, te] of TELUGU_TERM_GLOSSARY) {
+    if (hay.includes(en.toLowerCase())) matchedTerms.push(te);
+  }
+  const conceptTe = matchedTerms.length
+    ? matchedTerms.slice(0, 3).join(' • ')
+    : dayNotes?.titleTe || `డే ${q.dayNumber} — తెలంగాణ ఉద్యమ చరిత్ర (${q.subtopic || q.relatedConcept})`;
+  const revHintTe = dayNotes?.oneMinuteRevisionTe?.[0] || '';
+  return {
+    stemTe: `[తెలుగు అంశం: ${conceptTe}]\n${q.stem}`,
+    optionsTe: null,
+    explanationTe: revHintTe ? `తెలుగు ముఖ్యాంశం: ${revHintTe}` : ''
+  };
+}
+
+function renderLangToggleBar(compact = false) {
+  const modes = [
+    { k: 'EN', label: 'English' },
+    { k: 'BILINGUAL', label: 'EN + తెలుగు' },
+    { k: 'TE', label: 'తెలుగు' }
+  ];
+  return `
+  <div class="inline-flex items-center rounded-xl bg-amber-950/90 border border-amber-700/70 p-0.5 text-[11px] font-bold" role="group" aria-label="Language Toggle">
+    ${modes
+      .map(
+        (m) => `
+      <button type="button" onclick="setLanguageMode('${m.k}')"
+        class="px-2.5 py-1 rounded-lg transition ${
+          STATE.langMode === m.k ? 'bg-amber-400 text-stone-950 font-extrabold shadow-sm' : 'text-amber-100 hover:bg-amber-900/80'
+        }">${m.label}</button>`
+      )
+      .join('')}
+  </div>`;
+}
 
 function esc(str) {
   if (str === null || str === undefined) return '';
@@ -79,33 +200,76 @@ function esc(str) {
 }
 
 async function apiPost(path, payload) {
-  const res = await fetch('/api' + path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ learnerId: STATE.learnerId, ...payload })
-  });
-  return res.json();
+  try {
+    const res = await fetch('/api' + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ learnerId: STATE.learnerId, ...payload })
+    });
+    if (!res.ok) {
+      return { ok: false, error: 'HTTP ' + res.status };
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn('[apiPost warning]:', path, err);
+    return { ok: false, error: err?.message || 'Network request failed' };
+  }
 }
 
-async function loadBootstrap() {
+async function syncLearnerStateOnly() {
   try {
-    const res = await fetch('/api/bootstrap?learnerId=' + encodeURIComponent(STATE.learnerId));
-    const json = await res.json();
-    STATE.data = json;
-    if (json.learnerState?.learner) {
-      STATE.selectedDay = json.learnerState.learner.current_day || 1;
-      STATE.examLens = json.learnerState.learner.target_exam || 'BOTH';
+    const res = await fetch('/api/learner/state?learnerId=' + encodeURIComponent(STATE.learnerId), {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok && json.learnerState && STATE.data) {
+        STATE.data.learnerState = json.learnerState;
+      }
     }
-    initChronoOrder(0);
-    renderApp();
   } catch (err) {
-    document.getElementById('app-root').innerHTML = `
-      <div class="p-8 max-w-xl mx-auto mt-12 notebook-card rounded-2xl text-center">
-        <h2 class="text-xl font-bold text-red-700 mb-2">Failed to Load Knowledge Engine</h2>
-        <p class="text-sm text-slate-600 mb-4">${esc(err.message)}</p>
-        <button onclick="location.reload()" class="px-4 py-2 bg-amber-900 text-white rounded-lg">Retry</button>
-      </div>`;
+    console.warn('[syncLearnerStateOnly warning]:', err);
   }
+}
+
+async function loadBootstrap(forceReload = false) {
+  if (STATE.bootstrapPromise && !forceReload) {
+    return STATE.bootstrapPromise;
+  }
+  STATE.bootstrapPromise = (async () => {
+    try {
+      const res = await fetch('/api/bootstrap?learnerId=' + encodeURIComponent(STATE.learnerId), {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+      if (!res.ok) {
+        throw new Error('Bootstrap endpoint returned HTTP ' + res.status);
+      }
+      const json = await res.json();
+      STATE.data = json;
+      if (json.learnerState?.learner) {
+        STATE.selectedDay = json.learnerState.learner.current_day || 1;
+        STATE.examLens = json.learnerState.learner.target_exam || 'BOTH';
+      }
+      initChronoOrder(0);
+      renderApp();
+    } catch (err) {
+      const root = document.getElementById('app-root');
+      if (root) {
+        root.innerHTML = `
+        <div class="p-8 max-w-xl mx-auto mt-12 notebook-card rounded-2xl text-center">
+          <h2 class="text-xl font-bold text-red-700 mb-2">Failed to Load Knowledge Engine</h2>
+          <p class="text-sm text-slate-600 mb-4">${esc(err.message)}</p>
+          <button onclick="loadBootstrap(true)" class="px-4 py-2 bg-amber-900 text-white rounded-lg font-bold">Retry Connection</button>
+        </div>`;
+      }
+    } finally {
+      STATE.bootstrapPromise = null;
+    }
+  })();
+  return STATE.bootstrapPromise;
 }
 
 function getTopicProgress(topicId) {
@@ -206,9 +370,12 @@ function renderCausalChainDiagram(ce) {
   </div>`;
 }
 
-// Render Single Interactive Question Card (Supports Confidence Calibration BEFORE Reveal + 4-Option Distractor Breakdown)
+// Render Single Interactive Question Card (Supports English / Telugu Bilingual Toggle + Confidence Calibration BEFORE Reveal + 4-Option Distractor Breakdown)
 function renderQuestionCard(q, modeLabel = 'practice') {
   const ans = STATE.answeredQuestions[q.id];
+  const teBundle = getQuestionTeluguBundle(q);
+  const showEn = STATE.langMode === 'EN' || STATE.langMode === 'BILINGUAL';
+  const showTe = STATE.langMode === 'TE' || STATE.langMode === 'BILINGUAL';
   const originBadge =
     q.origin === 'VERIFIED_PYQ'
       ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-400"><i class="fas fa-check-circle mr-1"></i>VERIFIED OFFICIAL PYQ (${esc(q.officialQuestionCode)})</span>`
@@ -235,7 +402,16 @@ function renderQuestionCard(q, modeLabel = 'practice') {
       <span class="text-[11px] text-stone-500 font-medium">${esc(q.examName)} (${q.examYear})</span>
     </div>
 
-    <p class="text-sm md:text-base font-semibold text-stone-900 whitespace-pre-line leading-relaxed mb-4">${esc(q.stem)}</p>
+    ${
+      showEn
+        ? `<p class="text-sm md:text-base font-semibold text-stone-900 whitespace-pre-line leading-relaxed ${showTe ? 'mb-2' : 'mb-4'}">${esc(q.stem)}</p>`
+        : ''
+    }
+    ${
+      showTe && teBundle?.stemTe
+        ? `<div class="p-3 rounded-xl bg-amber-50/70 border border-amber-300/80 mb-4 font-telugu text-sm md:text-base font-semibold text-amber-950 whitespace-pre-line">${esc(teBundle.stemTe)}</div>`
+        : ''
+    }
 
     ${
       !ans
@@ -278,12 +454,14 @@ function renderQuestionCard(q, modeLabel = 'practice') {
               btnCls = 'bg-stone-50 border-stone-200 text-stone-500';
             }
           }
+          const optTe = teBundle?.optionsTe?.[idx] || null;
           return `
           <button ${ans ? 'disabled' : `onclick="submitSingleQuestion('${esc(q.id)}', ${idx}, '${esc(modeLabel)}')"`}
             class="w-full text-left p-3 rounded-xl border transition flex items-start gap-3 ${btnCls}">
             ${icon}
             <div class="flex-1">
-              <div class="text-sm font-medium">${esc(opt)}</div>
+              ${showEn || !optTe ? `<div class="text-sm font-medium">${esc(opt)}</div>` : ''}
+              ${showTe && optTe ? `<div class="font-telugu text-sm ${showEn ? 'text-amber-900 font-semibold mt-0.5' : 'font-semibold'}">${esc(optTe)}</div>` : ''}
               ${
                 ans
                   ? `<div class="text-xs mt-1 ${idx === q.correctIndex ? 'text-emerald-800 font-semibold' : 'text-stone-600'}">→ ${esc(
@@ -313,7 +491,12 @@ function renderQuestionCard(q, modeLabel = 'practice') {
           </span>
           <span class="text-[11px] font-semibold text-stone-600">Source: ${esc(q.questionSource)} | Key: ${esc(q.keySource)}</span>
         </div>
-        <p class="text-xs md:text-sm text-stone-800 leading-relaxed mb-2"><strong>Historical Explanation:</strong> ${esc(q.explanation)}</p>
+        ${showEn || !teBundle?.explanationTe ? `<p class="text-xs md:text-sm text-stone-800 leading-relaxed mb-2"><strong>Historical Explanation:</strong> ${esc(q.explanation)}</p>` : ''}
+        ${
+          showTe && teBundle?.explanationTe
+            ? `<p class="font-telugu text-xs md:text-sm text-amber-950 bg-white/80 p-2.5 rounded-lg border border-amber-300 mb-2"><strong>తెలుగు వివరణ:</strong> ${esc(teBundle.explanationTe)}</p>`
+            : ''
+        }
         <div class="flex flex-wrap items-center gap-2 text-xs">
           <span class="px-2 py-0.5 bg-white rounded border border-stone-300">Concept: <strong>${esc(q.relatedConcept)}</strong></span>
           ${
@@ -630,9 +813,12 @@ function renderTimelineView() {
   </section>`;
 }
 
-// 4. LEARN THE CONCEPT (FULL SECTION 7 ARCHITECTURE: A TO N + VISUAL MODE TOGGLE)
+// 4. LEARN THE CONCEPT (FULL SECTION 7 ARCHITECTURE: A TO N + VISUAL MODE TOGGLE + ENGLISH / TELUGU REVISION TOGGLE)
 function renderLessonView() {
   const day = STATE.data.curriculumDays.find((d) => d.dayNumber === STATE.selectedDay) || STATE.data.curriculumDays[0];
+  const teNotes = STATE.data.bilingualTelugu?.[day.id] || null;
+  const showEn = STATE.langMode === 'EN' || STATE.langMode === 'BILINGUAL';
+  const showTe = STATE.langMode === 'TE' || STATE.langMode === 'BILINGUAL';
   const prog = getTopicProgress(day.id);
   const linkedPeople = STATE.data.personalities.filter((p) => day.personIds.includes(p.id));
   const linkedCommittees = STATE.data.committees.filter((c) => day.committeeIds.includes(c.id));
@@ -642,7 +828,7 @@ function renderLessonView() {
 
   return `
   <section class="space-y-6">
-    <!-- Day Selector Strip & Visual Learning Mode Switch -->
+    <!-- Day Selector Strip & Visual Learning Mode + English/Telugu Switch -->
     <div class="notebook-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap gap-1.5">
         ${STATE.data.curriculumDays
@@ -656,7 +842,8 @@ function renderLessonView() {
           )
           .join('')}
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        ${renderLangToggleBar(true)}
         <button onclick="toggleVisualMode()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
           STATE.visualLearningOnly
             ? 'bg-indigo-900 text-white border-indigo-900'
@@ -679,7 +866,8 @@ function renderLessonView() {
         <span class="px-2.5 py-0.5 rounded bg-rose-100 text-rose-900 text-xs font-extrabold">${esc(day.priorityBadge)}</span>
         <span class="text-xs text-stone-600 font-semibold">${esc(day.phaseLabel)}</span>
       </div>
-      <h1 class="font-editorial text-2xl md:text-3xl font-extrabold text-stone-900 mb-2">${esc(day.title)}</h1>
+      ${showEn || !teNotes ? `<h1 class="font-editorial text-2xl md:text-3xl font-extrabold text-stone-900 mb-1.5">${esc(day.title)}</h1>` : ''}
+      ${showTe && teNotes ? `<h2 class="font-telugu text-xl md:text-2xl font-extrabold text-amber-900 mb-2">${esc(teNotes.titleTe)}</h2>` : ''}
       <p class="text-sm text-stone-600 mb-4">${esc(day.subtitle)}</p>
 
       <!-- Dual Exam Relevance Indicator (Section 3 Mandatory Requirement) -->
@@ -700,7 +888,15 @@ function renderLessonView() {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <div class="notebook-card rounded-2xl p-6 notebook-margin-line">
         <div class="text-xs font-extrabold uppercase tracking-wider text-amber-900 mb-1">A. Start With The Big Picture</div>
-        <p class="text-sm md:text-base text-stone-800 leading-relaxed font-medium">${esc(day.bigPicture)}</p>
+        ${showEn || !teNotes ? `<p class="text-sm md:text-base text-stone-800 leading-relaxed font-medium">${esc(day.bigPicture)}</p>` : ''}
+        ${
+          showTe && teNotes
+            ? `<div class="mt-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 font-telugu text-sm text-amber-950 leading-relaxed">
+                <div class="text-[11px] font-extrabold uppercase text-amber-800 mb-1">తెలుగు సారాంశం (Big Picture in Telugu)</div>
+                ${esc(teNotes.bigPictureTe)}
+               </div>`
+            : ''
+        }
       </div>
       <div class="notebook-card rounded-2xl p-6">
         <div class="text-xs font-extrabold uppercase tracking-wider text-stone-600 mb-1">B. Historical Background & Pre-Conditions</div>
@@ -882,15 +1078,32 @@ function renderLessonView() {
         : ''
     }
 
-    <!-- N: One-Minute Rapid Revision Panel + Source Verification Footer -->
+    <!-- N: One-Minute Rapid Revision Panel (English / తెలుగు Bilingual) + Source Verification Footer -->
     <div class="notebook-card rounded-2xl p-6 bg-stone-900 text-amber-50">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-xs font-extrabold uppercase tracking-widest text-amber-400">N. 60-Second Rapid Revision Compression</div>
-        <span class="text-xs text-stone-400">Next Assignment: ${esc(day.revisionAssignment)}</span>
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="text-xs font-extrabold uppercase tracking-widest text-amber-400">N. 60-Second Rapid Revision Compression ${showTe ? '• తెలుగు పునశ్చరణ' : ''}</div>
+        <div class="flex items-center gap-2">
+          ${renderLangToggleBar(true)}
+          <span class="text-xs text-stone-400 hidden sm:inline">Next: ${esc(day.revisionAssignment)}</span>
+        </div>
       </div>
-      <ul class="space-y-1.5 text-xs md:text-sm">
-        ${day.oneMinuteRevision.map((line) => `<li><span class="text-amber-400 font-bold mr-2">⚡</span>${esc(line)}</li>`).join('')}
-      </ul>
+      ${
+        showEn || !teNotes
+          ? `<ul class="space-y-1.5 text-xs md:text-sm ${showTe && teNotes ? 'mb-4 pb-4 border-b border-stone-700' : ''}">
+              ${day.oneMinuteRevision.map((line) => `<li><span class="text-amber-400 font-bold mr-2">⚡</span>${esc(line)}</li>`).join('')}
+             </ul>`
+          : ''
+      }
+      ${
+        showTe && teNotes
+          ? `<div class="font-telugu">
+              <div class="text-[11px] font-extrabold text-amber-300 uppercase mb-2">⚡ 60-సెకన్ల తెలుగు క్విక్ రివిజన్ నోట్స్ (${esc(teNotes.titleTe)})</div>
+              <ul class="space-y-2 text-xs md:text-sm text-amber-100">
+                ${teNotes.oneMinuteRevisionTe.map((line) => `<li><span class="text-emerald-400 font-bold mr-2">✦</span>${esc(line)}</li>`).join('')}
+              </ul>
+             </div>`
+          : ''
+      }
       <div class="mt-4 pt-3 border-t border-stone-700 text-[11px] text-stone-300 flex flex-wrap gap-2 items-center">
         <span class="font-bold text-amber-300"><i class="fas fa-check-shield mr-1"></i>Verified Sources for Day ${day.dayNumber}:</span>
         ${linkedSources.map((s) => `<span class="px-2 py-0.5 rounded bg-stone-800 border border-stone-600">${esc(s.id)}: ${esc(s.title.slice(0, 62))}…</span>`).join('')}
