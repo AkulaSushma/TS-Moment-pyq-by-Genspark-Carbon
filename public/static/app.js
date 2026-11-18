@@ -1550,7 +1550,142 @@ function renderMapView() {
         </div>
       </div>
     </div>
+
+    ${renderDistrict33CorrelationLayer()}
   </section>`;
+}
+
+// Module 8 Expansion: Interactive 10 Erstwhile -> 33 Present Districts Correlation Layer (2016/2019 Reorganisation + 1975 Zones + 2018 Multi-Zones)
+function renderDistrict33CorrelationLayer() {
+  const correlation = STATE.data.district33Correlation || [];
+  const q = STATE.districtSearch.trim().toLowerCase();
+
+  const filteredParents = correlation.filter((parent) => {
+    if (STATE.districtZoneFilter === 'ZONE_V' && !parent.zone1975.startsWith('Zone V (')) return false;
+    if (STATE.districtZoneFilter === 'ZONE_VI' && !parent.zone1975.startsWith('Zone VI')) return false;
+    if (STATE.districtZoneFilter === 'MZ_I' && !parent.multiZone2018.includes('Multi-Zone I')) return false;
+    if (STATE.districtZoneFilter === 'MZ_II' && !parent.multiZone2018.includes('Multi-Zone II')) return false;
+    if (STATE.selectedErstwhileNo > 0 && parent.erstwhileNo !== STATE.selectedErstwhileNo) return false;
+    if (!q) return true;
+    if (
+      parent.erstwhileName.toLowerCase().includes(q) ||
+      parent.erstwhileNameTe.includes(q) ||
+      parent.zone1975.toLowerCase().includes(q) ||
+      parent.multiZone2018.toLowerCase().includes(q)
+    ) {
+      return true;
+    }
+    return parent.presentDistricts.some(
+      (pd) =>
+        pd.name.toLowerCase().includes(q) ||
+        pd.nameTe.includes(q) ||
+        pd.formedYear.toLowerCase().includes(q) ||
+        pd.movementLandmark.toLowerCase().includes(q)
+    );
+  });
+
+  const totalPresentShown = filteredParents.reduce((sum, p) => sum + p.presentDistrictsCount, 0);
+
+  return `
+  <div id="district-33-correlation-layer" class="notebook-card rounded-2xl p-6 border-t-4 border-indigo-900">
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+      <div>
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-950 text-[11px] font-extrabold mb-1">
+          <i class="fas fa-layer-group"></i> 33-DISTRICT CORRELATION LAYER (2 JUNE 2014 → OCT 2016 → FEB 2019)
+        </div>
+        <h3 class="font-editorial text-xl md:text-2xl font-bold text-stone-900">10 Founding Districts → All 33 Present Telangana Districts Correlation Atlas</h3>
+        <p class="text-xs md:text-sm text-stone-600 mt-0.5">
+          Correlates every historical movement site across <strong>10 Appointed-Day Districts (2 June 2014)</strong>, <strong>21 New Districts (11 Oct 2016) + 2 New Districts (Mulugu &amp; Narayanpet, 17 Feb 2019 = 33 Total)</strong>, <strong>1975 Presidential Order Zones V/VI</strong>, and <strong>2018 Multi-Zones I/II</strong>.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-extrabold">
+        <span class="px-3 py-1.5 rounded-xl bg-indigo-950 text-amber-200">${filteredParents.length} Erstwhile → ${totalPresentShown} / 33 Districts</span>
+      </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 p-3.5 rounded-xl bg-stone-100 mb-4 text-xs">
+      <div class="md:col-span-5">
+        <label class="block font-bold text-stone-600 mb-1">Search Any of the 33 Districts, తెలుగు పేరు, or Movement Site</label>
+        <input type="search" value="${esc(STATE.districtSearch)}" oninput="setDistrictSearch(this.value)"
+          placeholder="e.g., Mulugu, Siddipet, Jagtial, Jodeghat, Bhongir, Indervelli…"
+          class="w-full px-3 py-2 rounded-lg border border-stone-300 bg-white font-medium" />
+      </div>
+      <div class="md:col-span-4">
+        <label class="block font-bold text-stone-600 mb-1">Filter by 1975 Zone / 2018 Multi-Zone</label>
+        <select onchange="setDistrictZoneFilter(this.value)" class="w-full p-2 rounded-lg border border-stone-300 bg-white font-semibold">
+          <option value="ALL" ${STATE.districtZoneFilter === 'ALL' ? 'selected' : ''}>All Zones &amp; Multi-Zones (All 33 Districts)</option>
+          <option value="ZONE_V" ${STATE.districtZoneFilter === 'ZONE_V' ? 'selected' : ''}>1975 Zone V — North/East (Adilabad, KNR, WGL, KMM → 16 Districts)</option>
+          <option value="ZONE_VI" ${STATE.districtZoneFilter === 'ZONE_VI' ? 'selected' : ''}>1975 Zone VI — Central/South &amp; Capital (6 Erstwhile → 17 Districts)</option>
+          <option value="MZ_I" ${STATE.districtZoneFilter === 'MZ_I' ? 'selected' : ''}>2018 Multi-Zone I (North Telangana)</option>
+          <option value="MZ_II" ${STATE.districtZoneFilter === 'MZ_II' ? 'selected' : ''}>2018 Multi-Zone II (South/Central Telangana)</option>
+        </select>
+      </div>
+      <div class="md:col-span-3">
+        <label class="block font-bold text-stone-600 mb-1">Founding Parent District (2014)</label>
+        <select onchange="selectErstwhileDistrict(parseInt(this.value, 10))" class="w-full p-2 rounded-lg border border-stone-300 bg-white font-semibold">
+          <option value="0" ${STATE.selectedErstwhileNo === 0 ? 'selected' : ''}>All 10 Founding Districts</option>
+          ${correlation
+            .map(
+              (p) =>
+                `<option value="${p.erstwhileNo}" ${STATE.selectedErstwhileNo === p.erstwhileNo ? 'selected' : ''}>${p.erstwhileNo}. ${esc(p.erstwhileName)} (${p.presentDistrictsCount})</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+    </div>
+
+    <!-- Parent-to-Child Correlation Cards -->
+    <div class="space-y-4">
+      ${filteredParents
+        .map(
+          (parent) => `
+        <div class="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-stone-200">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-amber-900 text-white text-xs font-extrabold flex items-center justify-center">${parent.erstwhileNo}</span>
+              <div>
+                <span class="font-editorial text-base md:text-lg font-extrabold text-stone-900">${esc(parent.erstwhileName)}</span>
+                <span class="font-telugu text-sm font-bold text-amber-900 ml-1.5">(${esc(parent.erstwhileNameTe)})</span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[11px] font-bold">${esc(parent.zone1975)}</span>
+              <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 text-[11px] font-bold">${esc(parent.multiZone2018)}</span>
+            </div>
+            <span class="text-xs font-extrabold text-stone-700 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-lg">
+              1 Erstwhile → ${parent.presentDistrictsCount} Present District${parent.presentDistrictsCount > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            ${parent.presentDistricts
+              .map(
+                (pd) => `
+              <div class="p-3 rounded-xl bg-amber-50/40 border border-stone-200 hover:border-amber-600 transition">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <div>
+                    <div class="text-xs md:text-sm font-extrabold text-stone-900">${esc(pd.name)}</div>
+                    <div class="font-telugu text-xs font-bold text-amber-900">${esc(pd.nameTe)}</div>
+                  </div>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                    pd.formedYear.includes('2019')
+                      ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                      : pd.formedYear.includes('Retained') || pd.formedYear.includes('Core')
+                      ? 'bg-stone-200 text-stone-800'
+                      : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
+                  }">${esc(pd.formedYear)}</span>
+                </div>
+                <p class="text-[11px] text-stone-700 leading-relaxed mt-1.5">
+                  <i class="fas fa-landmark text-amber-800 mr-1"></i>${esc(pd.movementLandmark)}
+                </p>
+              </div>`
+              )
+              .join('')}
+          </div>
+        </div>`
+        )
+        .join('')}
+    </div>
+  </div>`;
 }
 // ===================== VIEWS 9 TO 16 + EVENT CONTROLLERS =====================
 
@@ -1574,7 +1709,10 @@ function renderPyqView() {
           <h2 class="font-editorial text-2xl font-bold text-stone-900">PYQ Intelligence &amp; Repetition Evidence Centre</h2>
           <p class="text-sm text-stone-600">Empirical audit of <strong>${analytics.summary.papersAnalyzed} actual TSLPRB papers (2016–2023)</strong>. Newly generated model questions are strictly excluded from PYQ statistics.</p>
         </div>
-        <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-950 text-xs font-extrabold">${analytics.summary.verifiedPyqsCount} Official Key-Verified PYQs</span>
+        <div class="flex flex-wrap items-center gap-2">
+          ${renderLangToggleBar(true)}
+          <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-950 text-xs font-extrabold">${analytics.summary.verifiedPyqsCount} Official Key-Verified PYQs</span>
+        </div>
       </div>
 
       <!-- Date Restriction & Unresolved Abbreviation Compliance Notice -->
@@ -1677,6 +1815,7 @@ function renderPracticeView() {
           <h2 class="font-editorial text-2xl font-bold text-stone-900">Topic-Linked Multi-Format Question Bank (${STATE.data.questions.length} Questions)</h2>
           <p class="text-sm text-stone-600">Supports Single-MCQ, Match-the-Following, Chronological Arrangement, Statement-Based, Assertion-Reason, Person-Committee &amp; Cause-Effect formats.</p>
         </div>
+        ${renderLangToggleBar(true)}
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-xl bg-stone-100 mb-5 text-xs">
@@ -1716,8 +1855,11 @@ function renderPracticeView() {
   </section>`;
 }
 
-// 11. FULL-LENGTH EXAM SIMULATOR (Separate SI & Constable Streams + Configurable 2026 Negative Marking)
+// 11. FULL-LENGTH EXAM SIMULATOR (Separate SI & Constable Streams + 50Q & 100Q Grand Mocks + Configurable 2026 Negative Marking)
 function renderSimulatorView() {
+  const showEn = STATE.langMode === 'EN' || STATE.langMode === 'BILINGUAL';
+  const showTe = STATE.langMode === 'TE' || STATE.langMode === 'BILINGUAL';
+
   if (STATE.simActive) {
     const mins = String(Math.floor(STATE.simSecondsLeft / 60)).padStart(2, '0');
     const secs = String(STATE.simSecondsLeft % 60).padStart(2, '0');
@@ -1725,16 +1867,32 @@ function renderSimulatorView() {
 
     return `
     <section class="space-y-5">
-      <div class="sticky top-0 z-20 notebook-card rounded-2xl p-4 bg-stone-900 text-amber-50 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+      <div class="sticky top-14 z-20 notebook-card rounded-2xl p-4 bg-stone-900 text-amber-50 flex flex-wrap items-center justify-between gap-3 shadow-xl">
         <div>
-          <div class="text-xs font-extrabold text-amber-300 uppercase">${esc(STATE.simConfig.examType)} LIVE OMR SIMULATION</div>
-          <div class="text-sm font-bold">Answered: ${answeredCount} / ${STATE.simQuestions.length} • Negative Marking: -${STATE.simConfig.negativeRate} per wrong</div>
+          <div class="text-xs font-extrabold text-amber-300 uppercase">${esc(STATE.simConfig.examType)} LIVE OMR SIMULATION (${STATE.simQuestions.length} QUESTIONS)</div>
+          <div class="text-sm font-bold">Answered: <span id="sim-answered-counter">${answeredCount}</span> / ${STATE.simQuestions.length} • Negative Marking: -${STATE.simConfig.negativeRate} per wrong</div>
         </div>
-        <div class="flex items-center gap-3">
-          <div class="px-4 py-1.5 rounded-xl bg-amber-800 font-mono text-lg font-extrabold"><i class="fas fa-clock mr-1.5"></i>${mins}:${secs}</div>
-          <button onclick="finishExamSimulation()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold">
-            Submit OMR Sheet
+        <div class="flex flex-wrap items-center gap-2.5">
+          ${renderLangToggleBar(true)}
+          <div class="px-4 py-1.5 rounded-xl bg-amber-800 font-mono text-lg font-extrabold"><i class="fas fa-clock mr-1.5"></i><span id="sim-timer-display">${mins}:${secs}</span></div>
+          <button id="submit-omr-btn" onclick="finishExamSimulation()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow">
+            <i class="fas fa-check-circle mr-1"></i>Submit OMR Sheet
           </button>
+        </div>
+      </div>
+
+      <!-- Compact OMR Bubble Navigator (Especially useful for 50Q & 100Q Grand Mocks) -->
+      <div class="notebook-card rounded-2xl p-3.5 bg-white">
+        <div class="text-[11px] font-extrabold uppercase text-stone-500 mb-2">OMR Question Jump Palette (${answeredCount} Bubbled / ${STATE.simQuestions.length - answeredCount} Blank)</div>
+        <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+          ${STATE.simQuestions
+            .map((q, idx) => {
+              const bubbled = STATE.simAnswers[q.id] !== undefined;
+              return `<a href="#sim-q-${idx + 1}" class="w-7 h-7 rounded-lg text-[11px] font-extrabold flex items-center justify-center border transition ${
+                bubbled ? 'bg-amber-900 text-white border-amber-900' : 'bg-stone-100 text-stone-700 border-stone-300 hover:bg-amber-100'
+              }">${idx + 1}</a>`;
+            })
+            .join('')}
         </div>
       </div>
 
@@ -1742,24 +1900,34 @@ function renderSimulatorView() {
         ${STATE.simQuestions
           .map((q, idx) => {
             const sel = STATE.simAnswers[q.id];
+            const teBundle = getQuestionTeluguBundle(q);
             return `
-            <div class="notebook-card rounded-2xl p-5">
+            <div id="sim-q-${idx + 1}" class="notebook-card rounded-2xl p-5 scroll-mt-32">
               <div class="flex items-center justify-between text-xs text-stone-500 mb-2">
                 <span class="font-extrabold text-stone-800">Question ${idx + 1} of ${STATE.simQuestions.length}</span>
-                <span>Day ${q.dayNumber} • ${esc(q.format)}</span>
+                <span>Day ${q.dayNumber} • ${esc(q.format)} • ${q.origin === 'VERIFIED_PYQ' ? 'Official PYQ' : 'Model/Adapted'}</span>
               </div>
-              <p class="text-sm font-semibold text-stone-900 whitespace-pre-line mb-3">${esc(q.stem)}</p>
+              ${showEn ? `<p class="text-sm font-semibold text-stone-900 whitespace-pre-line ${showTe ? 'mb-2' : 'mb-3'}">${esc(q.stem)}</p>` : ''}
+              ${
+                showTe && teBundle?.stemTe
+                  ? `<div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-300/80 mb-3 font-telugu text-sm font-semibold text-amber-950 whitespace-pre-line">${esc(teBundle.stemTe)}</div>`
+                  : ''
+              }
               <div class="grid grid-cols-1 gap-2">
                 ${q.options
-                  .map(
-                    (opt, oIdx) => `
+                  .map((opt, oIdx) => {
+                    const optTe = teBundle?.optionsTe?.[oIdx] || null;
+                    return `
                   <button onclick="selectSimAnswer('${esc(q.id)}', ${oIdx})" class="w-full text-left p-3 rounded-xl border text-xs md:text-sm font-medium flex items-center gap-3 ${
                       sel === oIdx ? 'bg-amber-900 text-white border-amber-900' : 'bg-white hover:bg-amber-50 border-stone-300 text-stone-800'
                     }">
                     <span class="w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0">${oIdx + 1}</span>
-                    <span>${esc(opt)}</span>
-                  </button>`
-                  )
+                    <div>
+                      ${showEn || !optTe ? `<div>${esc(opt)}</div>` : ''}
+                      ${showTe && optTe ? `<div class="font-telugu ${sel === oIdx ? 'text-amber-200' : 'text-amber-950 font-semibold'}">${esc(optTe)}</div>` : ''}
+                    </div>
+                  </button>`;
+                  })
                   .join('')}
               </div>
               ${
@@ -1774,41 +1942,108 @@ function renderSimulatorView() {
     </section>`;
   }
 
+  const siPoolCount = STATE.data.questions.filter((q) => q.examSuitability !== 'PC_ONLY').length;
+  const pcPoolCount = STATE.data.questions.filter((q) => q.examSuitability !== 'SI_ONLY').length;
+
   return `
   <section class="space-y-6">
     <div class="notebook-card rounded-2xl p-6 border-t-4 border-amber-900">
-      <h2 class="font-editorial text-2xl font-bold text-stone-900 mb-1">2026 TGPRB Realistic Exam Simulator (Separate SI &amp; Constable Streams)</h2>
-      <p class="text-sm text-stone-600 mb-5">Matches official 29-07-2026 notifications: <strong>SI Prelims (-0.20 / 20%)</strong>, <strong>SI Mains FWE Paper IV (-0.25 / 25%)</strong>, and <strong>Constable Prelims (-0.20 / 20%, excluding SI-only technical syllabus assumptions)</strong>.</p>
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+        <div>
+          <h2 class="font-editorial text-2xl font-bold text-stone-900">2026 TGPRB Realistic Exam Simulator &amp; Grand Mock Arena</h2>
+          <p class="text-sm text-stone-600 mt-0.5">Matches official 29-07-2026 notifications: <strong>SI Prelims (-0.20 / 20%)</strong>, <strong>SI Mains FWE Paper IV (-0.25 / 25%)</strong>, and <strong>Constable Prelims (-0.20 / 20%)</strong>. Backed by <strong>${STATE.data.questions.length} verified &amp; analytical questions</strong> (${siPoolCount} SI-eligible • ${pcPoolCount} PC-eligible).</p>
+        </div>
+        ${renderLangToggleBar(true)}
+      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- Standard Sectional / Stream Tests (25Q / 30Q) -->
+      <div class="text-xs font-extrabold uppercase tracking-wider text-stone-500 mt-4 mb-2">A. Standard Stream Tests (25–30 Questions)</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
         <button onclick="configureSimulator('SI_PWT', 25, 0.20, 25)" class="p-4 rounded-2xl border-2 text-left transition ${
-          STATE.simConfig.examType === 'SI_PWT' ? 'border-amber-900 bg-amber-50' : 'border-stone-200 bg-white'
+          STATE.simConfig.examType === 'SI_PWT' && STATE.simConfig.questionCount === 25 ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-400'
         }">
           <div class="text-xs font-extrabold text-rose-900">STREAM 1 • Rc No. 225/2026</div>
-          <div class="font-editorial text-lg font-bold text-stone-900 mt-0.5">SCT SI Prelims (PWT) Mode</div>
-          <div class="text-xs text-stone-600 mt-1">All 3 Explicit SI Phases • <strong>20% (0.20) Negative Marking</strong> • 25 Questions</div>
+          <div class="font-editorial text-lg font-bold text-stone-900 mt-0.5">SCT SI Prelims (PWT) — 25Q</div>
+          <div class="text-xs text-stone-600 mt-1">All 3 Explicit SI Phases • <strong>20% (-0.20) Negative</strong> • 25 Mins</div>
         </button>
 
         <button onclick="configureSimulator('SI_FWE', 30, 0.25, 30)" class="p-4 rounded-2xl border-2 text-left transition ${
-          STATE.simConfig.examType === 'SI_FWE' ? 'border-amber-900 bg-amber-50' : 'border-stone-200 bg-white'
+          STATE.simConfig.examType === 'SI_FWE' && STATE.simConfig.questionCount === 30 ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-400'
         }">
           <div class="text-xs font-extrabold text-indigo-900">STREAM 2 • Rc No. 225/2026</div>
-          <div class="font-editorial text-lg font-bold text-stone-900 mt-0.5">SCT SI Mains (FWE Paper IV)</div>
-          <div class="text-xs text-stone-600 mt-1">High-Analytical &amp; Chronology Depth • <strong>25% (0.25) Negative Marking</strong> • 30 Questions</div>
+          <div class="font-editorial text-lg font-bold text-stone-900 mt-0.5">SCT SI Mains (FWE) — 30Q</div>
+          <div class="text-xs text-stone-600 mt-1">High-Analytical Depth • <strong>25% (-0.25) Negative</strong> • 30 Mins</div>
         </button>
 
         <button onclick="configureSimulator('PC_PWT', 25, 0.20, 25)" class="p-4 rounded-2xl border-2 text-left transition ${
-          STATE.simConfig.examType === 'PC_PWT' ? 'border-amber-900 bg-amber-50' : 'border-stone-200 bg-white'
+          STATE.simConfig.examType === 'PC_PWT' && STATE.simConfig.questionCount === 25 ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-400'
         }">
           <div class="text-xs font-extrabold text-sky-900">STREAM 3 • Rc No. 189/2026</div>
-          <div class="font-editorial text-lg font-bold text-stone-900 mt-0.5">SCT Constable (PC PWT) Mode</div>
-          <div class="text-xs text-stone-600 mt-1">"Contents Pertaining to Telangana" Filter • <strong>20% (0.20) Negative Marking</strong> • 25 Questions</div>
+          <div class="font-editorial text-lg font-bold text-stone-900 mt-0.5">SCT Constable (PC) — 25Q</div>
+          <div class="text-xs text-stone-600 mt-1">"Contents Pertaining to Telangana" • <strong>20% (-0.20) Negative</strong> • 25 Mins</div>
+        </button>
+      </div>
+
+      <!-- 50-Question & 100-Question Full Grand Mock Options -->
+      <div class="text-xs font-extrabold uppercase tracking-wider text-amber-900 mb-2">
+        <i class="fas fa-trophy mr-1"></i>B. Full-Length 50-Question &amp; 100-Question Grand Mocks (Non-Repeating Pool)
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+        <button id="preset-si-50" onclick="configureSimulator('SI_GRAND_50', 50, 0.20, 45)" class="p-4 rounded-2xl border-2 text-left transition ${
+          STATE.simConfig.examType === 'SI_GRAND_50' ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-500'
+        }">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-900 text-[10px] font-extrabold">SI GRAND MOCK • 50Q</span>
+            <span class="text-[11px] font-bold text-stone-500">45m</span>
+          </div>
+          <div class="font-editorial text-base font-bold text-stone-900 mt-1.5">50-Question SI Half-Marathon</div>
+          <div class="text-[11px] text-stone-600 mt-1">50 Distinct Questions • Phases I–III • <strong>-0.20 Negative</strong></div>
+        </button>
+
+        <button id="preset-si-100" onclick="configureSimulator('SI_GRAND_100', 100, 0.25, 90)" class="p-4 rounded-2xl border-2 text-left transition ${
+          STATE.simConfig.examType === 'SI_GRAND_100' ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-500'
+        }">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-950 text-[10px] font-extrabold">SI GRAND MOCK • 100Q</span>
+            <span class="text-[11px] font-bold text-stone-500">90m</span>
+          </div>
+          <div class="font-editorial text-base font-bold text-stone-900 mt-1.5">100-Question SI Mains Grand Mock</div>
+          <div class="text-[11px] text-stone-600 mt-1">100 Distinct Questions • Full FWE Rigor • <strong>-0.25 Negative</strong></div>
+        </button>
+
+        <button id="preset-pc-50" onclick="configureSimulator('PC_GRAND_50', 50, 0.20, 45)" class="p-4 rounded-2xl border-2 text-left transition ${
+          STATE.simConfig.examType === 'PC_GRAND_50' ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-500'
+        }">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-900 text-[10px] font-extrabold">PC GRAND MOCK • 50Q</span>
+            <span class="text-[11px] font-bold text-stone-500">45m</span>
+          </div>
+          <div class="font-editorial text-base font-bold text-stone-900 mt-1.5">50-Question Constable Grand Mock</div>
+          <div class="text-[11px] text-stone-600 mt-1">50 Distinct PC-Filtered Questions • <strong>-0.20 Negative</strong></div>
+        </button>
+
+        <button id="preset-pc-100" onclick="configureSimulator('PC_GRAND_100', 100, 0.20, 90)" class="p-4 rounded-2xl border-2 text-left transition ${
+          STATE.simConfig.examType === 'PC_GRAND_100' ? 'border-amber-900 bg-amber-50 shadow-sm' : 'border-stone-200 bg-white hover:border-amber-500'
+        }">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-950 text-[10px] font-extrabold">PC GRAND MOCK • 100Q</span>
+            <span class="text-[11px] font-bold text-stone-500">90m</span>
+          </div>
+          <div class="font-editorial text-base font-bold text-stone-900 mt-1.5">100-Question Constable Championship</div>
+          <div class="text-[11px] text-stone-600 mt-1">100 Distinct PC-Filtered Questions • <strong>-0.20 Negative</strong></div>
         </button>
       </div>
 
       <div class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-stone-100">
         <div class="flex flex-wrap items-center gap-4 text-xs font-bold">
-          <label>Custom Negative Penalty:
+          <label>Question Count:
+            <select onchange="setSimQuestionCount(parseInt(this.value, 10))" class="ml-1 p-1.5 rounded border bg-white font-extrabold">
+              ${[25, 30, 50, 100]
+                .map((cnt) => `<option value="${cnt}" ${STATE.simConfig.questionCount === cnt ? 'selected' : ''}>${cnt} Questions${cnt >= 50 ? ' (Grand Mock)' : ''}</option>`)
+                .join('')}
+            </select>
+          </label>
+          <label>Negative Penalty:
             <select onchange="STATE.simConfig.negativeRate=parseFloat(this.value);renderApp()" class="ml-1 p-1.5 rounded border bg-white">
               <option value="0.20" ${STATE.simConfig.negativeRate === 0.20 ? 'selected' : ''}>20% (-0.20 Official PWT)</option>
               <option value="0.25" ${STATE.simConfig.negativeRate === 0.25 ? 'selected' : ''}>25% (-0.25 Official SI FWE)</option>
@@ -1821,19 +2056,19 @@ function renderSimulatorView() {
               class="ml-1 w-16 p-1.5 rounded border bg-white text-center" />
           </label>
         </div>
-        <button onclick="startExamSimulation()" class="px-6 py-2.5 rounded-xl bg-amber-900 text-white text-sm font-extrabold shadow hover:bg-amber-800">
-          <i class="fas fa-play-circle mr-1.5"></i>Start Timed ${esc(STATE.simConfig.examType)} Exam Now
+        <button id="start-sim-btn" onclick="startExamSimulation()" class="px-6 py-2.5 rounded-xl bg-amber-900 text-white text-sm font-extrabold shadow hover:bg-amber-800">
+          <i class="fas fa-play-circle mr-1.5"></i>Start Timed ${STATE.simConfig.questionCount}-Q ${esc(STATE.simConfig.examType)} Exam
         </button>
       </div>
 
       ${
         STATE.simResult
           ? `
-        <div class="mt-6 p-6 rounded-2xl border-2 ${
+        <div id="omr-scorecard" class="mt-6 p-6 rounded-2xl border-2 scroll-mt-20 ${
           STATE.simResult.meets90Target ? 'bg-emerald-50 border-emerald-600' : 'bg-amber-50 border-amber-500'
         }">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <h3 class="font-editorial text-xl font-extrabold text-stone-900">Latest Simulation Scorecard (${esc(STATE.simResult.examType)})</h3>
+            <h3 class="font-editorial text-xl font-extrabold text-stone-900">Latest Simulation Scorecard (${esc(STATE.simResult.examType)} • ${STATE.simResult.totalQuestions} Questions)</h3>
             <span class="px-3 py-1 rounded-full text-xs font-extrabold ${
               STATE.simResult.meets90Target ? 'bg-emerald-700 text-white' : 'bg-amber-900 text-white'
             }">
@@ -2261,10 +2496,130 @@ function renderMainContent() {
   }
 }
 
+function renderProfileModal() {
+  if (!STATE.profileModalOpen) return '';
+  const currentLearner = STATE.data.learnerState?.learner || {};
+  const savedProfiles = STATE.data.learnerState?.profiles || [];
+  const stats = getOverallMasteryStats();
+
+  return `
+  <div id="learner-profile-modal" class="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="notebook-card rounded-2xl max-w-lg w-full p-6 bg-[#fffdf8] border-2 border-amber-900/40 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-start justify-between gap-3 pb-3 border-b border-stone-200">
+        <div>
+          <div class="text-[11px] font-extrabold uppercase tracking-wider text-amber-800">Persistent Learner Profile &amp; Session Control</div>
+          <h3 id="profile-modal-title" class="font-editorial text-xl font-bold text-stone-900">Switch Aspirant Profile or Manage Mastery</h3>
+        </div>
+        <button type="button" onclick="closeProfileModal()" class="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center" aria-label="Close modal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Create or Switch Profile Form -->
+      <form onsubmit="saveProfileFromModal(event)" class="space-y-3">
+        <div>
+          <label for="profile-display-name-input" class="block text-xs font-bold text-stone-700 mb-1">Aspirant Display Name / Profile ID</label>
+          <input id="profile-display-name-input" type="text" required maxlength="60"
+            value="${esc(STATE.profileModalName)}"
+            oninput="STATE.profileModalName = this.value"
+            placeholder="e.g., Ramesh SI 2026 or Aspirant Batch-2"
+            class="w-full px-3.5 py-2 rounded-xl border border-stone-300 bg-white text-sm font-semibold focus:outline-none focus:border-amber-800" />
+          <p class="text-[11px] text-stone-500 mt-1">Active Profile Key: <code class="bg-stone-100 px-1.5 py-0.5 rounded">${esc(STATE.learnerId)}</code></p>
+        </div>
+
+        <div>
+          <label for="profile-exam-select" class="block text-xs font-bold text-stone-700 mb-1">Target 2026 Recruitment Stream</label>
+          <select id="profile-exam-select" onchange="STATE.profileModalTargetExam = this.value" class="w-full p-2.5 rounded-xl border border-stone-300 bg-white text-xs font-bold">
+            <option value="BOTH" ${STATE.profileModalTargetExam === 'BOTH' ? 'selected' : ''}>Both SCT Sub-Inspector (SI) &amp; Constable (PC)</option>
+            <option value="SI" ${STATE.profileModalTargetExam === 'SI' ? 'selected' : ''}>SCT Sub-Inspector (Rc No. 225/2026) Only</option>
+            <option value="PC" ${STATE.profileModalTargetExam === 'PC' ? 'selected' : ''}>SCT Police Constable (Rc No. 189/2026) Only</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closeProfileModal()" class="px-4 py-2 rounded-xl border border-stone-300 bg-white text-xs font-bold text-stone-700 hover:bg-stone-50">
+            Cancel
+          </button>
+          <button id="save-profile-modal-btn" type="submit" ${STATE.profileBusy ? 'disabled' : ''} class="px-4 py-2 rounded-xl bg-amber-900 hover:bg-amber-800 text-white text-xs font-extrabold shadow">
+            <i class="fas fa-user-check mr-1"></i>${STATE.profileBusy ? 'Saving…' : 'Save / Switch Profile'}
+          </button>
+        </div>
+      </form>
+
+      ${
+        savedProfiles.length > 0
+          ? `
+        <div class="pt-3 border-t border-stone-200">
+          <div class="text-xs font-extrabold uppercase text-stone-500 mb-2">Recent Saved Profiles on This Device/DB</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${savedProfiles
+              .map(
+                (p) => `
+              <button type="button" onclick="quickSwitchProfile('${esc(p.id)}', '${esc(p.display_name)}', '${esc(p.target_exam || 'BOTH')}')"
+                class="px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                  p.id === STATE.learnerId ? 'bg-amber-900 text-white border-amber-900' : 'bg-stone-50 hover:bg-amber-50 border-stone-300 text-stone-800'
+                }">
+                <i class="fas fa-user mr-1 opacity-75"></i>${esc(p.display_name)}
+              </button>`
+              )
+              .join('')}
+          </div>
+        </div>`
+          : ''
+      }
+
+      <!-- Danger Zone: Reset Session Mastery with Mandatory Confirmation -->
+      <div class="pt-4 border-t border-rose-200">
+        <div class="p-4 rounded-xl bg-rose-50/80 border border-rose-200">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-extrabold text-rose-950 uppercase"><i class="fas fa-exclamation-triangle mr-1"></i>Reset Session Mastery &amp; Progress</div>
+              <p class="text-[11px] text-rose-900/90 mt-0.5">
+                Clears ${stats.studiedCount}/10 studied lessons, ${stats.totalAttempts} recorded question attempts, mock exam scores, and confusion flags for <strong>${esc(currentLearner.display_name || STATE.learnerId)}</strong>.
+              </p>
+            </div>
+          </div>
+
+          ${
+            !STATE.profileResetConfirmArmed
+              ? `
+            <button id="arm-reset-mastery-btn" type="button" onclick="armResetMasteryConfirmation()"
+              class="mt-3 px-3.5 py-2 rounded-xl bg-white border border-rose-400 text-rose-800 hover:bg-rose-100 text-xs font-extrabold transition">
+              <i class="fas fa-undo-alt mr-1"></i>Reset Session Mastery…
+            </button>`
+              : `
+            <div id="reset-mastery-confirm-box" class="mt-3 p-3 rounded-xl bg-white border-2 border-rose-600 space-y-2">
+              <div class="text-xs font-extrabold text-rose-900">
+                Are you sure you want to permanently reset all mastery, quiz attempts, and spaced-repetition intervals for "${esc(currentLearner.display_name || STATE.learnerId)}"?
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="confirm-reset-mastery-btn" type="button" onclick="confirmResetSessionMastery()" ${STATE.profileBusy ? 'disabled' : ''}
+                  class="px-3.5 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-xs font-extrabold shadow">
+                  <i class="fas fa-trash-alt mr-1"></i>Yes, Confirm Reset Mastery to 0%
+                </button>
+                <button type="button" onclick="cancelResetMasteryConfirmation()"
+                  class="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold">
+                  Keep My Progress
+                </button>
+              </div>
+            </div>`
+          }
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderApp() {
   if (!STATE.data) return;
   const stats = getOverallMasteryStats();
   const learnerName = STATE.data.learnerState?.learner?.display_name || 'Telangana Police Aspirant';
+
+  for (const cat of NAV_CATEGORIES) {
+    if (cat.items.some((i) => i.id === STATE.activeTab) && STATE.sidebarGroupsOpen[cat.id] === undefined) {
+      STATE.sidebarGroupsOpen[cat.id] = true;
+    }
+  }
 
   document.getElementById('app-root').innerHTML = `
     <!-- Top Header Bar -->
@@ -2278,14 +2633,17 @@ function renderApp() {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2.5 text-xs">
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          ${renderLangToggleBar(false)}
           <div class="px-3 py-1 rounded-lg bg-amber-950/90 border border-amber-700/60">
             Mastery: <strong class="${stats.avgMastery >= 90 ? 'text-emerald-400' : 'text-amber-300'}">${stats.avgMastery}%</strong>
             <span class="text-amber-400/60 mx-1">|</span>
             Acc: <strong>${stats.globalAcc}%</strong>
           </div>
-          <button onclick="promptLearnerSwitch()" class="px-3 py-1 rounded-lg bg-amber-800 hover:bg-amber-700 text-amber-50 font-semibold">
-            <i class="fas fa-user-graduate mr-1"></i>${esc(learnerName)}
+          <button id="open-profile-modal-btn" type="button" onclick="promptLearnerSwitch()" class="px-3 py-1 rounded-lg bg-amber-800 hover:bg-amber-700 text-amber-50 font-semibold flex items-center gap-1.5">
+            <i class="fas fa-user-graduate"></i>
+            <span class="max-w-[160px] truncate">${esc(learnerName)}</span>
+            <i class="fas fa-sliders-h text-[10px] opacity-80"></i>
           </button>
         </div>
       </div>
@@ -2293,27 +2651,64 @@ function renderApp() {
 
     <!-- Main Workspace Layout -->
     <div class="max-w-[1480px] w-full mx-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 px-3 md:px-5 py-5">
-      <!-- Left Navigation Sidebar (16 Modules) -->
+      <!-- Left Navigation Sidebar: 16 Modules Grouped into 4 Collapsible Categories -->
       <aside class="lg:col-span-3 xl:col-span-3">
-        <nav aria-label="Learning Modules" class="notebook-card rounded-2xl p-3 lg:sticky lg:top-16 space-y-1">
-          <div class="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-stone-500">16 Intelligence Modules</div>
-          ${NAV_SECTIONS.map(
-            (item) => `
-            <button onclick="switchTab('${item.id}')" id="nav-${item.id}"
-              class="w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition ${
-                STATE.activeTab === item.id ? 'nav-item-active' : 'text-stone-700 hover:bg-amber-100/60'
-              }">
-              <span class="flex items-center gap-2.5 truncate">
-                <i class="fas ${item.icon} w-4 text-center opacity-85"></i>
-                <span class="truncate">${item.num}. ${esc(item.label)}</span>
-              </span>
+        <nav aria-label="Learning Modules" class="notebook-card rounded-2xl p-3 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto space-y-2">
+          <div class="px-2 py-1 flex items-center justify-between">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">4 Study Suites • 16 Modules</span>
+            <button type="button" onclick="openResetMasteryDirectly()" class="text-[10px] font-bold text-rose-800 hover:underline" title="Reset or manage session mastery">
+              <i class="fas fa-undo-alt mr-0.5"></i>Reset
+            </button>
+          </div>
+          ${NAV_CATEGORIES.map((cat) => {
+            const isOpen = Boolean(STATE.sidebarGroupsOpen[cat.id]);
+            const hasActive = cat.items.some((it) => it.id === STATE.activeTab);
+            const hasAlert = cat.id === 'Tools' && stats.unresolvedConfusions > 0;
+            return `
+            <div class="rounded-xl border ${hasActive ? 'border-amber-800/40 bg-amber-50/40' : 'border-stone-200/80 bg-white/70'} overflow-hidden">
+              <button type="button" id="cat-toggle-${cat.id}" onclick="toggleSidebarCategory('${cat.id}')" aria-expanded="${isOpen}"
+                class="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-amber-100/40 transition">
+                <span class="flex items-center gap-2 min-w-0">
+                  <span class="w-6 h-6 rounded-lg ${hasActive ? 'bg-amber-900 text-white' : 'bg-stone-200/80 text-stone-700'} flex items-center justify-center text-[11px] shrink-0">
+                    <i class="fas ${cat.icon}"></i>
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block text-xs font-extrabold text-stone-900 leading-tight">${esc(cat.label)}</span>
+                    <span class="block text-[10px] text-stone-500 truncate">${esc(cat.subtitle)}</span>
+                  </span>
+                </span>
+                <span class="flex items-center gap-1.5 shrink-0">
+                  ${hasAlert ? `<span class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold">${stats.unresolvedConfusions}</span>` : ''}
+                  <i class="fas fa-chevron-${isOpen ? 'up' : 'down'} text-[10px] text-stone-500"></i>
+                </span>
+              </button>
               ${
-                item.id === 'weakmemory' && stats.unresolvedConfusions > 0
-                  ? `<span class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px]">${stats.unresolvedConfusions}</span>`
+                isOpen
+                  ? `<div class="px-1.5 pb-1.5 pt-0.5 space-y-0.5 border-t border-stone-200/60">
+                      ${cat.items
+                        .map(
+                          (item) => `
+                        <button type="button" onclick="switchTab('${item.id}')" id="nav-${item.id}"
+                          class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center justify-between transition ${
+                            STATE.activeTab === item.id ? 'nav-item-active' : 'text-stone-700 hover:bg-amber-100/60'
+                          }">
+                          <span class="flex items-center gap-2 truncate">
+                            <i class="fas ${item.icon} w-4 text-center opacity-85"></i>
+                            <span class="truncate">${item.num}. ${esc(item.label)}</span>
+                          </span>
+                          ${
+                            item.id === 'weakmemory' && stats.unresolvedConfusions > 0
+                              ? `<span class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px]">${stats.unresolvedConfusions}</span>`
+                              : ''
+                          }
+                        </button>`
+                        )
+                        .join('')}
+                     </div>`
                   : ''
               }
-            </button>`
-          ).join('')}
+            </div>`;
+          }).join('')}
         </nav>
       </aside>
 
@@ -2322,12 +2717,31 @@ function renderApp() {
         ${renderMainContent()}
       </main>
     </div>
+
+    ${renderProfileModal()}
   `;
 }
 
 // Global Action Handlers
+window.toggleSidebarCategory = function (catId) {
+  STATE.sidebarGroupsOpen[catId] = !STATE.sidebarGroupsOpen[catId];
+  renderApp();
+};
+
+window.setLanguageMode = function (mode) {
+  if (!['EN', 'BILINGUAL', 'TE'].includes(mode)) return;
+  STATE.langMode = mode;
+  localStorage.setItem('tg_lang_mode', mode);
+  renderApp();
+};
+
 window.switchTab = function (tabId) {
   STATE.activeTab = tabId;
+  for (const cat of NAV_CATEGORIES) {
+    if (cat.items.some((it) => it.id === tabId)) {
+      STATE.sidebarGroupsOpen[cat.id] = true;
+    }
+  }
   renderApp();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -2406,8 +2820,11 @@ window.submitSingleQuestion = async function (questionId, selectedOption, mode) 
       whyOthersWrong: res.whyOthersWrong,
       triggeredConfusionPair: res.triggeredConfusionPair
     };
-    const b = await fetch('/api/bootstrap?learnerId=' + encodeURIComponent(STATE.learnerId)).then((r) => r.json());
-    STATE.data.learnerState = b.learnerState;
+    if (res.learnerState) {
+      STATE.data.learnerState = res.learnerState;
+    } else {
+      await syncLearnerStateOnly();
+    }
     renderApp();
   }
 };
@@ -2476,6 +2893,21 @@ window.selectMapPin = function (idx) {
   renderApp();
 };
 
+window.setDistrictZoneFilter = function (val) {
+  STATE.districtZoneFilter = val;
+  renderApp();
+};
+
+window.setDistrictSearch = function (val) {
+  STATE.districtSearch = val;
+  renderApp();
+};
+
+window.selectErstwhileDistrict = function (no) {
+  STATE.selectedErstwhileNo = Number(no) || 0;
+  renderApp();
+};
+
 window.setPyqFilter = function (kind, val) {
   STATE['pyqFilter' + kind] = val;
   renderApp();
@@ -2527,9 +2959,12 @@ window.solveChronoOrder = function () {
 };
 
 window.resolveWeakFlag = async function (pairId) {
-  await apiPost('/weak-memory/resolve', { pairId });
-  const b = await fetch('/api/bootstrap?learnerId=' + encodeURIComponent(STATE.learnerId)).then((r) => r.json());
-  STATE.data.learnerState = b.learnerState;
+  const res = await apiPost('/weak-memory/resolve', { pairId });
+  if (res.ok && res.learnerState) {
+    STATE.data.learnerState = res.learnerState;
+  } else {
+    await syncLearnerStateOnly();
+  }
   renderApp();
 };
 
@@ -2538,9 +2973,24 @@ window.configureSimulator = function (examType, count, negRate, mins) {
   renderApp();
 };
 
+window.setSimQuestionCount = function (count) {
+  const isPc = STATE.simConfig.examType.startsWith('PC');
+  const mins = count === 100 ? 90 : count === 50 ? 45 : count;
+  const examType =
+    count === 100 ? (isPc ? 'PC_GRAND_100' : 'SI_GRAND_100') : count === 50 ? (isPc ? 'PC_GRAND_50' : 'SI_GRAND_50') : isPc ? 'PC_PWT' : 'SI_PWT';
+  STATE.simConfig.questionCount = count;
+  STATE.simConfig.durationMinutes = mins;
+  STATE.simConfig.examType = examType;
+  renderApp();
+};
+
 window.startExamSimulation = function () {
   const isPc = STATE.simConfig.examType.startsWith('PC');
-  const pool = STATE.data.questions.filter((q) => (isPc ? q.examSuitability !== 'SI_ONLY' : q.examSuitability !== 'PC_ONLY'));
+  const pool = [...STATE.data.questions.filter((q) => (isPc ? q.examSuitability !== 'SI_ONLY' : q.examSuitability !== 'PC_ONLY'))];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
   const selected = pool.slice(0, Math.min(pool.length, STATE.simConfig.questionCount));
   STATE.simQuestions = selected;
   STATE.simAnswers = {};
@@ -2553,7 +3003,12 @@ window.startExamSimulation = function () {
     if (STATE.simSecondsLeft <= 0) {
       window.finishExamSimulation();
     } else {
-      renderApp();
+      const timerEl = document.getElementById('sim-timer-display');
+      if (timerEl) {
+        const mins = String(Math.floor(STATE.simSecondsLeft / 60)).padStart(2, '0');
+        const secs = String(STATE.simSecondsLeft % 60).padStart(2, '0');
+        timerEl.textContent = `${mins}:${secs}`;
+      }
     }
   }, 1000);
   renderApp();
@@ -2562,16 +3017,21 @@ window.startExamSimulation = function () {
 
 window.selectSimAnswer = function (qId, optIdx) {
   STATE.simAnswers[qId] = optIdx;
+  const scrollY = window.scrollY;
   renderApp();
+  window.scrollTo(0, scrollY);
 };
 
 window.clearSimBubble = function (qId) {
   delete STATE.simAnswers[qId];
+  const scrollY = window.scrollY;
   renderApp();
+  window.scrollTo(0, scrollY);
 };
 
 window.finishExamSimulation = async function () {
   if (STATE.simTimerId) clearInterval(STATE.simTimerId);
+  STATE.simTimerId = null;
   STATE.simActive = false;
   const elapsed = STATE.simConfig.durationMinutes * 60 - Math.max(0, STATE.simSecondsLeft);
   const responses = STATE.simQuestions.map((q) => ({
@@ -2586,21 +3046,116 @@ window.finishExamSimulation = async function () {
   });
   if (res.ok) {
     STATE.simResult = res.result;
-    const b = await fetch('/api/bootstrap?learnerId=' + encodeURIComponent(STATE.learnerId)).then((r) => r.json());
-    STATE.data.learnerState = b.learnerState;
+    if (res.learnerState) {
+      STATE.data.learnerState = res.learnerState;
+    } else {
+      await syncLearnerStateOnly();
+    }
   }
   renderApp();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const scorecard = document.getElementById('omr-scorecard');
+  if (scorecard) {
+    window.scrollTo({ top: scorecard.offsetTop, behavior: 'smooth' });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 };
 
-window.promptLearnerSwitch = async function () {
-  const newName = prompt('Enter Learner Display Name (or Profile ID to switch/create persistent profile):', STATE.data.learnerState?.learner?.display_name || 'Telangana Police Aspirant');
+window.promptLearnerSwitch = function () {
+  const learner = STATE.data?.learnerState?.learner || {};
+  STATE.profileModalName = learner.display_name || 'Telangana Police Aspirant';
+  STATE.profileModalTargetExam = learner.target_exam || STATE.examLens || 'BOTH';
+  STATE.profileResetConfirmArmed = false;
+  STATE.profileModalOpen = true;
+  renderApp();
+};
+
+window.openResetMasteryDirectly = function () {
+  const learner = STATE.data?.learnerState?.learner || {};
+  STATE.profileModalName = learner.display_name || 'Telangana Police Aspirant';
+  STATE.profileModalTargetExam = learner.target_exam || STATE.examLens || 'BOTH';
+  STATE.profileResetConfirmArmed = true;
+  STATE.profileModalOpen = true;
+  renderApp();
+};
+
+window.closeProfileModal = function () {
+  STATE.profileModalOpen = false;
+  STATE.profileResetConfirmArmed = false;
+  renderApp();
+};
+
+window.saveProfileFromModal = async function (ev) {
+  if (ev) ev.preventDefault();
+  const newName = String(STATE.profileModalName || '').trim();
   if (!newName) return;
-  const slug = newName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28) || 'aspirant-default';
+  const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28) || 'aspirant-default';
+  STATE.profileBusy = true;
+  renderApp();
   STATE.learnerId = slug;
+  STATE.examLens = STATE.profileModalTargetExam || 'BOTH';
   localStorage.setItem('tg_learner_id', slug);
-  await apiPost('/learner/profile', { learnerId: slug, displayName: newName.trim(), targetExam: STATE.examLens, currentDay: STATE.selectedDay });
-  await loadBootstrap();
+  const res = await apiPost('/learner/profile', {
+    learnerId: slug,
+    displayName: newName,
+    targetExam: STATE.examLens,
+    currentDay: STATE.selectedDay
+  });
+  if (res.ok && res.learnerState) {
+    STATE.data.learnerState = res.learnerState;
+  } else {
+    await syncLearnerStateOnly();
+  }
+  STATE.answeredQuestions = {};
+  STATE.profileBusy = false;
+  STATE.profileModalOpen = false;
+  STATE.profileResetConfirmArmed = false;
+  renderApp();
+};
+
+window.quickSwitchProfile = async function (id, displayName, targetExam) {
+  STATE.profileModalName = displayName;
+  STATE.profileModalTargetExam = targetExam || 'BOTH';
+  STATE.profileBusy = true;
+  renderApp();
+  STATE.learnerId = id;
+  STATE.examLens = STATE.profileModalTargetExam;
+  localStorage.setItem('tg_learner_id', id);
+  await syncLearnerStateOnly();
+  STATE.answeredQuestions = {};
+  STATE.profileBusy = false;
+  STATE.profileModalOpen = false;
+  STATE.profileResetConfirmArmed = false;
+  renderApp();
+};
+
+window.armResetMasteryConfirmation = function () {
+  STATE.profileResetConfirmArmed = true;
+  renderApp();
+};
+
+window.cancelResetMasteryConfirmation = function () {
+  STATE.profileResetConfirmArmed = false;
+  renderApp();
+};
+
+window.confirmResetSessionMastery = async function () {
+  STATE.profileBusy = true;
+  renderApp();
+  const res = await apiPost('/learner/reset', { learnerId: STATE.learnerId });
+  if (res.ok && res.learnerState) {
+    STATE.data.learnerState = res.learnerState;
+  } else {
+    await syncLearnerStateOnly();
+  }
+  STATE.answeredQuestions = {};
+  STATE.revealedRecall = {};
+  STATE.simResult = null;
+  STATE.selectedDay = 1;
+  STATE.profileBusy = false;
+  STATE.profileResetConfirmArmed = false;
+  STATE.profileModalOpen = false;
+  renderApp();
 };
 
 // Boot Application
